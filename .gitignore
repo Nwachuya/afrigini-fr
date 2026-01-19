@@ -1,0 +1,29 @@
+# Next.js
+.next/
+out/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-store/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.staging.local
+.env.*.local
+
+# IDEs and other tools
+.vscode/
+.DS_Store
+*.log
+*.log.*
+.env
+.env.*
+
+# PocketBase specific (if running PocketBase locally within the same repo)
+pb_data/
+pb_migrations/
+*.db
