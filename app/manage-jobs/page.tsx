@@ -99,8 +99,22 @@ export default function ManageJobsPage() {
                       {new Date(job.created).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 text-right space-x-3">
-                      <Link href={`/jobs/${job.id}`} className="text-blue-600 hover:text-blue-800">View</Link>
-                      <button className="text-gray-400 hover:text-gray-600">Edit</button>
+                      {/* View Link (Public Job Page) */}
+                      <Link 
+                        href={`/jobs/${job.id}`} 
+                        className="text-gray-500 hover:text-blue-600 font-medium transition-colors"
+                        target="_blank"
+                      >
+                        View
+                      </Link>
+                      
+                      {/* Edit Link (Manage Job Page) */}
+                      <Link 
+                        href={`/manage-jobs/${job.id}`} 
+                        className="text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                      >
+                        Edit
+                      </Link>
                     </td>
                   </tr>
                 ))}

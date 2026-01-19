@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import pb from '@/lib/pocketbase'; // Import the PB instance directly to listen to changes
+import pb from '@/lib/pocketbase'; 
 import { getCurrentUser, getUserRole } from '@/lib/auth';
 import { UserRecord, UserRole } from '@/types';
 import UserDropdown from './UserDropdown';
@@ -12,21 +12,17 @@ export default function Navbar() {
   const [userRole, setUserRole] = useState<UserRole | null>(null);
 
   useEffect(() => {
-    // 1. Define function to update local state from auth store
     const updateState = () => {
       setUser(getCurrentUser());
       setUserRole(getUserRole());
     };
 
-    // 2. Run immediately on mount
     updateState();
 
-    // 3. Subscribe to real-time auth changes (Login/Logout events)
     const unsubscribe = pb.authStore.onChange(() => {
       updateState();
     });
 
-    // 4. Cleanup subscription on unmount
     return () => {
       unsubscribe();
     };
@@ -71,6 +67,7 @@ export default function Navbar() {
                 <div className="hidden md:flex space-x-6 text-sm font-medium">
                   <Link href="/dashboard/organization" className="hover:text-blue-400 transition-colors">Dashboard</Link>
                   <Link href="/manage-jobs" className="hover:text-blue-400 transition-colors">Manage Jobs</Link>
+                  <Link href="/applications" className="hover:text-blue-400 transition-colors">Applications</Link>
                   <Link href="/find-candidates" className="hover:text-blue-400 transition-colors">Find Candidates</Link>
                 </div>
               )}
