@@ -2,44 +2,85 @@
 
 import { useEffect, useState } from 'react';
 import pb from '@/lib/pocketbase';
-import { UserRecord } from '@/types';
+import { UserRecord, CandidateProfileRecord, JobRecord } from '@/types';
 import Link from 'next/link';
 
 export default function ApplicantDashboard() {
   const [user, setUser] = useState<UserRecord | null>(null);
-  const [stats, setStats] = useState({ applied: 0, interviews: 0, accepted: 0 });
+  const [profile, setProfile] = useState<CandidateProfileRecord | null>(null);
+  const [stats, setStats] = useState({ applied: 0, interviews: 0, accepted: 0, videoRequests: 0, invites: 0 });
+  const [recommendedJobs, setRecommendedJobs] = useState<JobRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const currentUser = pb.authStore.model as unknown as UserRecord;
-        setUser(currentUser);
+        if (!pb.authStore.isValid) return;
 
-        if (currentUser) {
-          // 1. Get total applications count
-          const appliedRes = await pb.collection('job_applications').getList(1, 1, {
-            filter: `applicant.user = "${currentUser.id}"`,
-          });
+        // 1. Re-fetch user record
+        const freshUser = await pb.collection('users').getOne(pb.authStore.model!.id);
+        setUser(freshUser as unknown as UserRecord);
 
-          // 2. Get interviews count (Stage is 'Interview' or 'Invited')
-          const interviewRes = await pb.collection('job_applications').getList(1, 1, {
-            filter: `applicant.user = "${currentUser.id}" && (stage = "Interview" || stage = "Invited")`,
-          });
+        // 2. Fetch candidate profile
+        let candidateProfile: CandidateProfileRecord | null = null;
+        try {
+          candidateProfile = await pb.collection('candidate_profiles').getFirstListItem(
+            `user = "${freshUser.id}"`, { requestKey: null }
+          ) as unknown as CandidateProfileRecord;
+          setProfile(candidateProfile);
+        } catch(e) {
+          console.log("No profile record found.");
+          setLoading(false);
+          return; 
+        }
 
-          // 3. Get accepted count
-          const acceptedRes = await pb.collection('job_applications').getList(1, 1, {
-            filter: `applicant.user = "${currentUser.id}" && stage = "Accepted"`,
-          });
+        // 3. Fetch stats if profile exists
+        if (candidateProfile) {
+          const profileId = candidateProfile.id;
+          const filter = `applicant = "${profileId}"`;
+
+          const [
+            appliedRes, interviewRes, acceptedRes, videoRes, invitesRes, allApplicationsRes,
+          ] = await Promise.all([
+            pb.collection('job_applications').getList(1, 1, { filter, requestKey: null }),
+            pb.collection('job_applications').getList(1, 1, { filter: `${filter} && (stage = "Interview" || stage = "Invited")`, requestKey: null }),
+            pb.collection('job_applications').getList(1, 1, { filter: `${filter} && stage = "Accepted"`, requestKey: null }),
+            pb.collection('job_applications').getList(1, 1, { filter: `${filter} && stage = "Send Video"`, requestKey: null }),
+            pb.collection('job_invitations').getList(1, 1, { filter: `candidate_profile = "${profileId}" && status = "pending"`, requestKey: null }),
+            pb.collection('job_applications').getFullList({ filter, requestKey: null }),
+          ]);
 
           setStats({
             applied: appliedRes.totalItems,
             interviews: interviewRes.totalItems,
             accepted: acceptedRes.totalItems,
+            videoRequests: videoRes.totalItems,
+            invites: invitesRes.totalItems,
           });
+
+          // 4. Fetch Recommendations
+          const appliedJobIds = allApplicationsRes.map(app => app.job);
+          const preferredDeptIds = candidateProfile.preference || [];
+
+          if (preferredDeptIds.length > 0) {
+            const recommendationFilters = ['stage = "Open"'];
+            const deptFilter = preferredDeptIds.map(id => `department ~ "${id}"`).join(' || ');
+            recommendationFilters.push(`(${deptFilter})`);
+            if (appliedJobIds.length > 0) {
+              const appliedFilter = appliedJobIds.map(id => `id != "${id}"`).join(' && ');
+              recommendationFilters.push(appliedFilter);
+            }
+            const recommendedRes = await pb.collection('jobs').getList(1, 3, {
+              filter: recommendationFilters.join(' && '),
+              sort: '-created',
+              expand: 'organization',
+              requestKey: null,
+            });
+            setRecommendedJobs(recommendedRes.items as unknown as JobRecord[]);
+          }
         }
       } catch (e) {
-        console.error("Error fetching dashboard data", e);
+        console.error("Error fetching dashboard data:", e);
       } finally {
         setLoading(false);
       }
@@ -48,19 +89,21 @@ export default function ApplicantDashboard() {
     fetchData();
   }, []);
 
-  if (loading) return <div className="p-8">Loading dashboard...</div>;
-  if (!user) return <div className="p-8">Please log in.</div>;
+  if (loading) return <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center text-gray-500">Loading dashboard...</div>;
+  if (!user) return <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center text-gray-500">Please log in.</div>;
 
-  // Avatar URL helper
   const avatarUrl = user.avatar 
     ? `${process.env.NEXT_PUBLIC_POCKETBASE_URL}/api/files/users/${user.id}/${user.avatar}` 
     : null;
+    
+  const isProfileIncomplete = !profile || !profile.headline || !profile.resume;
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
-      {/* Header / Greeting */}
-      <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-6">
-        <div className="h-20 w-20 rounded-full bg-blue-100 flex items-center justify-center overflow-hidden border-2 border-blue-50">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      
+      {/* Header */}
+      <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-6">
+        <div className="h-20 w-20 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 border-white shadow-sm">
           {avatarUrl ? (
             <img src={avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
           ) : (
@@ -69,62 +112,104 @@ export default function ApplicantDashboard() {
         </div>
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Hello, {user.name || 'Applicant'}!</h1>
-          <p className="text-gray-500 mt-1">Welcome back to your job search portal.</p>
-          <div className="mt-3 flex space-x-3">
-             <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
-               Open to Work
-             </span>
-             {user.verified && (
-               <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
-                 Verified
-               </span>
-             )}
-          </div>
+          <p className="text-gray-500 mt-1">Welcome back. Let's find your next opportunity.</p>
         </div>
       </div>
+
+      {/* Profile Callout */}
+      {isProfileIncomplete && (
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-6 rounded-r-lg flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="text-yellow-500">
+              <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="font-bold text-yellow-800">Complete Your Profile</h3>
+              <p className="text-sm text-yellow-700">Add your resume and a headline to increase your chances of getting noticed.</p>
+            </div>
+          </div>
+          <Link 
+            href="/my-profile" 
+            className="px-5 py-2.5 bg-yellow-400 text-yellow-900 font-bold text-sm rounded-lg hover:bg-yellow-500 transition-colors flex-shrink-0"
+          >
+            Go to Profile
+          </Link>
+        </div>
+      )}
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <h3 className="text-gray-500 font-medium">Applications Sent</h3>
-            <span className="text-blue-600 bg-blue-50 p-2 rounded-lg">📤</span>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+        <MetricCard title="Applications Sent" value={stats.applied} icon="mail" color="blue" href="/my-applications" />
+        <MetricCard title="Video Requests" value={stats.videoRequests} icon="video" color="purple" href="/my-applications?stage=Send+Video" />
+        <MetricCard title="Interviews" value={stats.interviews} icon="calendar" color="teal" href="/my-applications?stage=Interview" />
+        <MetricCard title="Job Invites" value={stats.invites} icon="inbox" color="indigo" href="/my-invites" />
+        <MetricCard title="Offers" value={stats.accepted} icon="sparkles" color="green" href="/my-applications?stage=Accepted" />
+      </div>
+      
+      {/* Recommended Jobs */}
+      <div>
+        <h2 className="text-xl font-bold text-gray-900 mb-4">Recommended for You</h2>
+        {recommendedJobs.length === 0 ? (
+          <div className="bg-white p-8 rounded-lg border border-gray-200 text-center text-gray-500">
+            <p>
+              {profile?.preference?.length > 0 
+                ? "No new jobs match your preferences right now. Check back later!" 
+                : "Add department preferences to your profile to see recommended jobs."}
+            </p>
           </div>
-          <p className="text-3xl font-bold mt-2 text-gray-900">{stats.applied}</p>
-          <p className="text-sm text-gray-400 mt-2">Total active applications</p>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <h3 className="text-gray-500 font-medium">Interviews</h3>
-            <span className="text-purple-600 bg-purple-50 p-2 rounded-lg">🎥</span>
+        ) : (
+          <div className="space-y-4">
+            {recommendedJobs.map((job) => (
+              <Link key={job.id} href={`/jobs/${job.id}`} className="block group">
+                <div className="bg-white p-4 rounded-lg border border-gray-200 hover:border-blue-500 hover:shadow-sm transition-all flex items-center gap-4">
+                  <div className="flex-grow">
+                    <p className="font-bold text-gray-900 group-hover:text-blue-600">{job.role}</p>
+                    <p className="text-sm text-gray-500">{job.expand?.organization?.name || 'A Company'}</p>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <span>{job.type}</span>
+                    <svg className="w-5 h-5 text-gray-300 group-hover:text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                  </div>
+                </div>
+              </Link>
+            ))}
           </div>
-          <p className="text-3xl font-bold mt-2 text-gray-900">{stats.interviews}</p>
-          <p className="text-sm text-gray-400 mt-2">Upcoming & Completed</p>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <h3 className="text-gray-500 font-medium">Offers</h3>
-            <span className="text-green-600 bg-green-50 p-2 rounded-lg">🎉</span>
-          </div>
-          <p className="text-3xl font-bold mt-2 text-gray-900">{stats.accepted}</p>
-          <p className="text-sm text-gray-400 mt-2">Accepted applications</p>
-        </div>
+        )}
       </div>
 
-      {/* Quick Actions */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-        <h2 className="text-lg font-bold mb-4">Quick Actions</h2>
-        <div className="flex space-x-4">
-          <Link href="/jobs" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium">
-            Find New Jobs
-          </Link>
-          <Link href="/my-profile" className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 text-sm font-medium">
-            Update Profile
-          </Link>
-        </div>
-      </div>
     </div>
   );
 }
+
+// Reusable Metric Card Component
+const MetricCard = ({ title, value, icon, color, href }: { title: string; value: number; icon: string; color: string; href: string }) => {
+  const CardContent = () => (
+    <>
+      <div className="flex items-center justify-between">
+        <h3 className="text-gray-500 font-medium text-sm">{title}</h3>
+        <div className={`p-2 rounded-lg bg-${color}-50 text-${color}-600`}>
+          {icons[icon]}
+        </div>
+      </div>
+      <p className="text-3xl font-bold mt-2 text-gray-900">{value}</p>
+    </>
+  );
+
+  const icons: { [key: string]: JSX.Element } = {
+    mail: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
+    video: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>,
+    calendar: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
+    inbox: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>,
+    sparkles: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>,
+  };
+  
+  return (
+    <Link href={href} className="block group">
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 h-full group-hover:border-blue-500 group-hover:shadow-md transition-all">
+        <CardContent />
+      </div>
+    </Link>
+  );
+};
