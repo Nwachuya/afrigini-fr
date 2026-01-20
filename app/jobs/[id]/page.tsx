@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import pb from '@/lib/pocketbase';
@@ -11,13 +11,27 @@ export default function JobDetailsPage() {
   const router = useRouter();
   const id = params.id as string;
 
+  // Data State
   const [job, setJob] = useState<JobRecord | null>(null);
   const [loading, setLoading] = useState(true);
-  const [applying, setApplying] = useState(false);
   const [hasApplied, setHasApplied] = useState(false);
   const [user, setUser] = useState<UserRecord | null>(null);
   const [profile, setProfile] = useState<CandidateProfileRecord | null>(null);
+  
+  // Application Form State
+  const [showModal, setShowModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  
+  // Form Fields
+  const [resumeChoice, setResumeChoice] = useState<'existing' | 'new'>('existing');
+  const [coverLetterType, setCoverLetterType] = useState<'text' | 'file'>('text');
+  const [coverLetterText, setCoverLetterText] = useState('');
+  const [startDate, setStartDate] = useState('');
+  
+  // File Refs
+  const resumeInputRef = useRef<HTMLInputElement>(null);
+  const coverLetterInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -25,14 +39,14 @@ export default function JobDetailsPage() {
         const currentUser = pb.authStore.model as unknown as UserRecord;
         setUser(currentUser);
 
-        // 1. Fetch Job Details
+        // 1. Fetch Job
         const jobRes = await pb.collection('jobs').getOne(id, {
           expand: 'organization,department',
         });
         setJob(jobRes as unknown as JobRecord);
 
+        // 2. Check User Status
         if (currentUser) {
-          // 2. Check if user has a profile and has already applied
           try {
             const profileRes = await pb.collection('candidate_profiles').getFirstListItem(
               `user = "${currentUser.id}"`
@@ -46,11 +60,11 @@ export default function JobDetailsPage() {
               if (applications.totalItems > 0) setHasApplied(true);
             }
           } catch (e) {
-            // User is likely a Company or hasn't created a profile yet
+            // No profile or not applied
           }
         }
       } catch (err) {
-        console.error("Error loading job:", err);
+        console.error("Error loading data:", err);
       } finally {
         setLoading(false);
       }
@@ -59,60 +73,78 @@ export default function JobDetailsPage() {
     fetchData();
   }, [id]);
 
-  const handleApply = async () => {
+  const openApplicationModal = () => {
     if (!user) {
       router.push('/login?redirect=/jobs/' + id);
       return;
     }
-    
     if (user.role !== 'Applicant') {
       setError("Company accounts cannot apply to jobs.");
       return;
     }
-
     if (!profile) {
       setError("Please create your candidate profile in the Dashboard before applying.");
       return;
     }
+    
+    // Reset form and open
+    setError('');
+    setResumeChoice(profile.resume ? 'existing' : 'new'); 
+    setStartDate('');
+    setCoverLetterText('');
+    setShowModal(true);
+  };
 
-    setApplying(true);
+  const handleSubmitApplication = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile) return;
+    
+    setSubmitting(true);
     setError('');
 
     try {
-      await pb.collection('job_applications').create({
-        job: id,
-        applicant: profile.id,
-        stage: 'Applied',
-      });
+      const formData = new FormData();
+      formData.append('job', id);
+      formData.append('applicant', profile.id);
+      formData.append('stage', 'Applied');
+      
+      // New Field: Earliest Start Date
+      if (startDate) {
+        formData.append('earliest_start_date', new Date(startDate).toISOString());
+      }
+
+      // Handle Resume
+      if (resumeChoice === 'new') {
+        if (resumeInputRef.current?.files?.length) {
+          formData.append('resume_file', resumeInputRef.current.files[0]);
+        } else {
+          throw new Error("Please select a resume file to upload.");
+        }
+      } 
+      // If 'existing', we don't upload to 'resume_file'. 
+      // The backend will see 'resume_file' is empty and you can reference the profile resume in the viewer.
+
+      // Handle Cover Letter
+      if (coverLetterType === 'text' && coverLetterText) {
+        formData.append('cover_letter', coverLetterText);
+      } else if (coverLetterType === 'file' && coverLetterInputRef.current?.files?.length) {
+        formData.append('cover_letter_file', coverLetterInputRef.current.files[0]);
+      }
+
+      await pb.collection('job_applications').create(formData);
+      
       setHasApplied(true);
+      setShowModal(false);
     } catch (err: any) {
-      console.error("Apply error:", err);
+      console.error("Application error:", err);
       setError(err.message || "Failed to submit application.");
     } finally {
-      setApplying(false);
+      setSubmitting(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center text-gray-500">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        Loading job details...
-      </div>
-    );
-  }
-
-  if (!job) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
-        <h2 className="text-2xl font-bold text-gray-900">Job not found</h2>
-        <p className="text-gray-500 mt-2">This job posting may have been removed or expired.</p>
-        <Link href="/jobs" className="text-blue-600 hover:underline mt-4 inline-block">
-          &larr; Back to Jobs
-        </Link>
-      </div>
-    );
-  }
+  if (loading) return <div className="max-w-7xl mx-auto px-4 py-20 text-center text-gray-500">Loading...</div>;
+  if (!job) return <div className="max-w-7xl mx-auto px-4 py-20 text-center text-gray-500">Job not found.</div>;
 
   const org = job.expand?.organization;
   const logoUrl = org?.logo 
@@ -133,10 +165,9 @@ export default function JobDetailsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* LEFT COLUMN: Job Content */}
+        {/* LEFT COLUMN: Content */}
         <div className="lg:col-span-2 space-y-8">
-          
-          {/* Header Card */}
+          {/* Header */}
           <div className="bg-white border border-gray-200 rounded-xl p-8 shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-start gap-6">
               <div className="h-20 w-20 bg-gray-50 rounded-lg flex items-center justify-center flex-shrink-0 border border-gray-100 overflow-hidden text-gray-400">
@@ -151,7 +182,6 @@ export default function JobDetailsPage() {
               <div className="flex-grow">
                 <h1 className="text-3xl font-bold text-gray-900 leading-tight">{job.role}</h1>
                 <p className="text-lg text-gray-600 font-medium mt-1">{org?.name}</p>
-                
                 <div className="flex flex-wrap gap-3 mt-4 text-sm text-gray-600">
                   <span className="flex items-center gap-1.5 bg-gray-100 px-3 py-1 rounded-full">
                     <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -167,38 +197,23 @@ export default function JobDetailsPage() {
                       {job.currency} {job.salary.toLocaleString()} / {job.paymentType}
                     </span>
                   )}
-                  {job.expand?.department?.map((dept: any) => (
-                     <span key={dept.id} className="flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100">
-                       <svg className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                       </svg>
-                       {dept.department}
-                     </span>
-                  ))}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Description & Benefits */}
+          {/* Description */}
           <div className="bg-white border border-gray-200 rounded-xl p-8 shadow-sm space-y-8">
             {job.description && (
               <section>
                 <h2 className="text-xl font-bold text-gray-900 mb-4 border-b border-gray-100 pb-2">About the Role</h2>
-                <div 
-                  className="prose max-w-none text-gray-600 leading-relaxed [&>ul]:list-disc [&>ul]:pl-5 [&>ol]:list-decimal [&>ol]:pl-5 [&>p]:mb-4"
-                  dangerouslySetInnerHTML={{ __html: job.description }}
-                />
+                <div className="prose max-w-none text-gray-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: job.description }} />
               </section>
             )}
-
             {job.benefits && (
               <section>
                 <h2 className="text-xl font-bold text-gray-900 mb-4 border-b border-gray-100 pb-2">Benefits & Perks</h2>
-                <div 
-                  className="prose max-w-none text-gray-600 leading-relaxed [&>ul]:list-disc [&>ul]:pl-5 [&>ol]:list-decimal [&>ol]:pl-5 [&>p]:mb-4"
-                  dangerouslySetInnerHTML={{ __html: job.benefits }}
-                />
+                <div className="prose max-w-none text-gray-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: job.benefits }} />
               </section>
             )}
           </div>
@@ -207,7 +222,7 @@ export default function JobDetailsPage() {
         {/* RIGHT COLUMN: Sticky Sidebar */}
         <div className="lg:col-span-1">
           <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm sticky top-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Interested in this role?</h3>
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Interested?</h3>
             
             {error && (
               <div className="mb-4 p-3 bg-red-50 text-red-700 text-sm rounded-lg border border-red-200">
@@ -217,10 +232,8 @@ export default function JobDetailsPage() {
 
             {user?.role === 'Company' ? (
               <div className="p-4 bg-gray-50 text-gray-600 text-center rounded-lg text-sm border border-gray-100">
-                <div className="mb-2 text-2xl">🏢</div>
-                You are logged in as a <strong>Company</strong>. 
-                <br/>
-                Please use an Applicant account to apply.
+                <span className="block text-2xl mb-2">🏢</span>
+                Logged in as Company. <br/> Switch to an Applicant account to apply.
               </div>
             ) : hasApplied ? (
               <div className="w-full py-4 bg-green-50 text-green-700 font-bold rounded-lg border border-green-200 flex flex-col items-center justify-center text-center">
@@ -228,38 +241,151 @@ export default function JobDetailsPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span>Application Sent!</span>
-                <span className="text-xs font-normal mt-1 text-green-600">Good luck!</span>
               </div>
             ) : (
               <button 
-                onClick={handleApply}
-                disabled={applying}
-                className="w-full py-3.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-all shadow-md hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
+                onClick={openApplicationModal}
+                className="w-full py-3.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-all shadow-md hover:shadow-lg"
               >
-                {applying ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Sending...
-                  </>
-                ) : (
-                  'Apply Now'
-                )}
+                Apply Now
               </button>
-            )}
-
-            {hasApplied && (
-              <div className="mt-4 pt-4 border-t border-gray-100 text-center">
-                <Link href="/dashboard/applicant" className="text-sm text-blue-600 hover:text-blue-800 font-medium">
-                  Track your application status &rarr;
-                </Link>
-              </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* APPLICATION MODAL */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-fade-in">
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
+              <h3 className="text-xl font-bold text-gray-900">Apply for {job.role}</h3>
+              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+
+            <form onSubmit={handleSubmitApplication} className="p-6 space-y-6">
+              
+              {/* 1. Resume Selection */}
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-3">Resume</h4>
+                <div className="space-y-3">
+                  {/* EXISTING RESUME OPTION (FIXED LAYOUT) */}
+                  {profile?.resume && (
+                    <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors w-full">
+                      <input 
+                        type="radio" 
+                        name="resume" 
+                        checked={resumeChoice === 'existing'} 
+                        onChange={() => setResumeChoice('existing')}
+                        className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 flex-shrink-0" 
+                      />
+                      <div className="ml-3 text-sm text-gray-700 flex items-center min-w-0">
+                        <span className="whitespace-nowrap mr-1">Use existing resume</span>
+                        <span className="text-gray-400 text-xs truncate" title={profile.resume}>
+                          ({profile.resume})
+                        </span>
+                      </div>
+                    </label>
+                  )}
+                  
+                  {/* NEW RESUME OPTION */}
+                  <label className="flex items-start p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                    <input 
+                      type="radio" 
+                      name="resume" 
+                      checked={resumeChoice === 'new'} 
+                      onChange={() => setResumeChoice('new')}
+                      className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 mt-1" 
+                    />
+                    <div className="ml-3 w-full">
+                      <span className="block text-sm text-gray-700 mb-2">Upload new resume</span>
+                      {resumeChoice === 'new' && (
+                        <input 
+                          type="file" 
+                          ref={resumeInputRef}
+                          accept=".pdf,.doc,.docx"
+                          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        />
+                      )}
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* 2. Cover Letter */}
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-3">Cover Letter <span className="text-gray-400 font-normal text-sm">(Optional)</span></h4>
+                <div className="flex gap-4 mb-3 text-sm">
+                  <button 
+                    type="button"
+                    onClick={() => setCoverLetterType('text')}
+                    className={`pb-1 border-b-2 ${coverLetterType === 'text' ? 'border-blue-600 text-blue-600 font-medium' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                  >
+                    Write Note
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setCoverLetterType('file')}
+                    className={`pb-1 border-b-2 ${coverLetterType === 'file' ? 'border-blue-600 text-blue-600 font-medium' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                  >
+                    Upload File
+                  </button>
+                </div>
+
+                {coverLetterType === 'text' ? (
+                  <textarea 
+                    rows={4}
+                    value={coverLetterText}
+                    onChange={(e) => setCoverLetterText(e.target.value)}
+                    placeholder="Introduce yourself and explain why you're a good fit..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  ></textarea>
+                ) : (
+                  <input 
+                    type="file" 
+                    ref={coverLetterInputRef}
+                    accept=".pdf,.doc,.docx"
+                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  />
+                )}
+              </div>
+
+              {/* 3. Earliest Start Date */}
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-3">Availability</h4>
+                <label className="block text-sm text-gray-600 mb-1">Earliest Start Date</label>
+                <input 
+                  type="date" 
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              {error && <p className="text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100">{error}</p>}
+
+              <div className="pt-2 flex gap-3">
+                <button 
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="flex-1 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  disabled={submitting}
+                  className="flex-1 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-70 transition-colors"
+                >
+                  {submitting ? 'Submitting...' : 'Submit Application'}
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
