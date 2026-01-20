@@ -10,13 +10,13 @@ export default function Footer() {
           <p>&copy; {currentYear} Afrigini. All rights reserved.</p>
         </div>
         <nav className="flex space-x-8">
-          <Link href="/contact" className="hover:text-brand-green transition-colors">
+          <Link href="https://afrigini.com/contact" className="hover:text-brand-green transition-colors">
             Contact
           </Link>
-          <Link href="/terms" className="hover:text-brand-green transition-colors">
+          <Link href="https://afrigini.com/terms" className="hover:text-brand-green transition-colors">
             Terms of Service
           </Link>
-          <Link href="/privacy" className="hover:text-brand-green transition-colors">
+          <Link href="https://afrigini.com/privacy" className="hover:text-brand-green transition-colors">
             Privacy Policy
           </Link>
         </nav>
