@@ -68,6 +68,8 @@ export default function Navbar() {
                   <Link href="/dashboard/applicant" className="hover:text-brand-green transition-colors">Dashboard</Link>
                   <Link href="/jobs" className="hover:text-brand-green transition-colors">Jobs</Link>
                   <Link href="/my-applications" className="hover:text-brand-green transition-colors">My Applications</Link>
+                  <Link href="/my-profile" className="hover:text-brand-green transition-colors">My Profile</Link>
+
                 </div>
               ) : (
                 <div className="hidden md:flex gap-6 text-sm font-medium text-gray-600">
