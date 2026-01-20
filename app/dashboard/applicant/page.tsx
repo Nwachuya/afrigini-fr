@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import pb from '@/lib/pocketbase';
 import { UserRecord, CandidateProfileRecord, JobRecord } from '@/types';
 import Link from 'next/link';
@@ -66,10 +66,12 @@ export default function ApplicantDashboard() {
             const recommendationFilters = ['stage = "Open"'];
             const deptFilter = preferredDeptIds.map(id => `department ~ "${id}"`).join(' || ');
             recommendationFilters.push(`(${deptFilter})`);
+            
             if (appliedJobIds.length > 0) {
               const appliedFilter = appliedJobIds.map(id => `id != "${id}"`).join(' && ');
               recommendationFilters.push(appliedFilter);
             }
+            
             const recommendedRes = await pb.collection('jobs').getList(1, 3, {
               filter: recommendationFilters.join(' && '),
               sort: '-created',
@@ -142,10 +144,10 @@ export default function ApplicantDashboard() {
       {/* Metrics Grid */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
         <MetricCard title="Applications Sent" value={stats.applied} icon="mail" color="blue" href="/my-applications" />
-        <MetricCard title="Video Requests" value={stats.videoRequests} icon="video" color="purple" href="/my-applications?stage=Send+Video" />
-        <MetricCard title="Interviews" value={stats.interviews} icon="calendar" color="teal" href="/my-applications?stage=Interview" />
+        <MetricCard title="Video Requests" value={stats.videoRequests} icon="video" color="purple" href="/my-applications" />
+        <MetricCard title="Interviews" value={stats.interviews} icon="calendar" color="teal" href="/my-applications" />
         <MetricCard title="Job Invites" value={stats.invites} icon="inbox" color="indigo" href="/my-invites" />
-        <MetricCard title="Offers" value={stats.accepted} icon="sparkles" color="green" href="/my-applications?stage=Accepted" />
+        <MetricCard title="Offers" value={stats.accepted} icon="sparkles" color="green" href="/my-applications" />
       </div>
       
       {/* Recommended Jobs */}
@@ -154,7 +156,7 @@ export default function ApplicantDashboard() {
         {recommendedJobs.length === 0 ? (
           <div className="bg-white p-8 rounded-lg border border-gray-200 text-center text-gray-500">
             <p>
-              {profile?.preference?.length > 0 
+              {(profile?.preference?.length ?? 0) > 0 
                 ? "No new jobs match your preferences right now. Check back later!" 
                 : "Add department preferences to your profile to see recommended jobs."}
             </p>
@@ -184,31 +186,37 @@ export default function ApplicantDashboard() {
 }
 
 // Reusable Metric Card Component
-const MetricCard = ({ title, value, icon, color, href }: { title: string; value: number; icon: string; color: string; href: string }) => {
-  const CardContent = () => (
-    <>
-      <div className="flex items-center justify-between">
-        <h3 className="text-gray-500 font-medium text-sm">{title}</h3>
-        <div className={`p-2 rounded-lg bg-${color}-50 text-${color}-600`}>
-          {icons[icon]}
-        </div>
-      </div>
-      <p className="text-3xl font-bold mt-2 text-gray-900">{value}</p>
-    </>
-  );
+type IconKey = 'mail' | 'video' | 'calendar' | 'inbox' | 'sparkles';
+type ColorKey = 'blue' | 'purple' | 'teal' | 'indigo' | 'green';
 
-  const icons: { [key: string]: JSX.Element } = {
+const MetricCard = ({ title, value, icon, color, href }: { title: string; value: number; icon: IconKey; color: ColorKey; href: string }) => {
+  
+  const icons: Record<IconKey, React.ReactNode> = {
     mail: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
     video: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>,
     calendar: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
     inbox: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>,
     sparkles: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>,
   };
-  
+
+  const bgColors: Record<ColorKey, string> = {
+    blue: 'bg-blue-50 text-blue-600',
+    purple: 'bg-purple-50 text-purple-600',
+    teal: 'bg-teal-50 text-teal-600',
+    indigo: 'bg-indigo-50 text-indigo-600',
+    green: 'bg-green-50 text-green-600',
+  };
+
   return (
     <Link href={href} className="block group">
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 h-full group-hover:border-blue-500 group-hover:shadow-md transition-all">
-        <CardContent />
+        <div className="flex items-center justify-between">
+          <h3 className="text-gray-500 font-medium text-sm">{title}</h3>
+          <div className={`p-2 rounded-lg ${bgColors[color]}`}>
+            {icons[icon]}
+          </div>
+        </div>
+        <p className="text-3xl font-bold mt-2 text-gray-900">{value}</p>
       </div>
     </Link>
   );
