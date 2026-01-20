@@ -6,7 +6,8 @@ import Link from 'next/link';
 import pb from '@/lib/pocketbase';
 import { UserRecord, CandidateProfileRecord, JobApplicationRecord } from '@/types';
 
-interface ExpandedApplication extends JobApplicationRecord {
+// FIX: Use Omit to prevent type conflict with the base record
+interface ExpandedApplication extends Omit<JobApplicationRecord, 'expand'> {
   expand: {
     job: {
       id: string;
@@ -24,9 +25,9 @@ interface ExpandedApplication extends JobApplicationRecord {
 
 export default function MyApplicationsPage() {
   const router = useRouter();
+  
   const [loading, setLoading] = useState(true);
   const [applications, setApplications] = useState<ExpandedApplication[]>([]);
-  const [profile, setProfile] = useState<CandidateProfileRecord | null>(null);
 
   useEffect(() => {
     const loadApplications = async () => {
@@ -43,9 +44,8 @@ export default function MyApplicationsPage() {
             `user = "${user.id}"`,
             { requestKey: null }
           );
-          setProfile(candidateProfile as unknown as CandidateProfileRecord);
         } catch (e) {
-          console.log("No profile found for user, cannot fetch applications.");
+          console.log("No profile found");
           setLoading(false);
           return;
         }
@@ -57,6 +57,7 @@ export default function MyApplicationsPage() {
         });
 
         setApplications(result as unknown as ExpandedApplication[]);
+
       } catch (err) {
         console.error("Error loading applications:", err);
       } finally {
@@ -66,18 +67,15 @@ export default function MyApplicationsPage() {
     loadApplications();
   }, [router]);
 
-  const getStatusInfo = (stage: string) => {
-    const statuses: Record<string, { text: string; bgClass: string; textClass: string; borderClass: string }> = {
-      'Applied': { text: 'Application Sent', bgClass: 'bg-blue-50', textClass: 'text-blue-700', borderClass: 'border-blue-200' },
-      'Review': { text: 'Under Review', bgClass: 'bg-yellow-50', textClass: 'text-yellow-700', borderClass: 'border-yellow-200' },
-      'Send Video': { text: 'Video Requested', bgClass: 'bg-orange-50', textClass: 'text-orange-700', borderClass: 'border-orange-200' },
-      'Interview': { text: 'Interview Stage', bgClass: 'bg-purple-50', textClass: 'text-purple-700', borderClass: 'border-purple-200' },
-      'Invited': { text: 'Invited', bgClass: 'bg-indigo-50', textClass: 'text-indigo-700', borderClass: 'border-indigo-200' },
-      'Accepted': { text: 'Offer Extended', bgClass: 'bg-green-50', textClass: 'text-green-700', borderClass: 'border-green-200' },
-      'Completed': { text: 'Completed', bgClass: 'bg-emerald-50', textClass: 'text-emerald-700', borderClass: 'border-emerald-200' },
-      'Rejected': { text: 'Not Selected', bgClass: 'bg-red-50', textClass: 'text-red-700', borderClass: 'border-red-200' },
-    };
-    return statuses[stage] || { text: stage, bgClass: 'bg-gray-50', textClass: 'text-gray-700', borderClass: 'border-gray-200' };
+  const getStatusColor = (stage: string) => {
+    switch (stage) {
+      case 'Applied': return 'bg-blue-50 text-blue-700 border-blue-100';
+      case 'Review': return 'bg-yellow-50 text-yellow-700 border-yellow-100';
+      case 'Interview': return 'bg-purple-50 text-purple-700 border-purple-100';
+      case 'Accepted': return 'bg-green-50 text-green-700 border-green-100';
+      case 'Rejected': return 'bg-red-50 text-red-700 border-red-100';
+      default: return 'bg-gray-50 text-gray-700 border-gray-100';
+    }
   };
 
   if (loading) return <div className="max-w-7xl mx-auto px-4 py-8 text-center text-gray-500">Loading your applications...</div>;
@@ -92,7 +90,7 @@ export default function MyApplicationsPage() {
       {applications.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-xl p-12 text-center shadow-sm">
           <div className="text-4xl mb-4">📄</div>
-          <h3 className="text-lg font-medium text-gray-900">You haven&apos;t applied to any jobs yet.</h3>
+          <h3 className="text-lg font-medium text-gray-900">You haven't applied to any jobs yet.</h3>
           <p className="text-gray-500 mb-6">Start exploring opportunities and submitting your applications.</p>
           <Link href="/jobs" className="px-5 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors">
             Find Jobs
@@ -104,20 +102,19 @@ export default function MyApplicationsPage() {
             {applications.map(app => {
               const job = app.expand?.job;
               const org = job?.expand?.organization;
-              const status = getStatusInfo(app.stage);
+              
               const logoUrl = org?.logo 
                 ? `${process.env.NEXT_PUBLIC_POCKETBASE_URL}/api/files/organizations/${org.id}/${org.logo}`
                 : null;
-              const needsAction = app.stage === 'Send Video';
               
               return (
                 <li key={app.id} className="p-6 hover:bg-gray-50 transition-colors">
                   <Link href={`/my-applications/${app.id}`} className="block">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 bg-gray-50 rounded-lg flex items-center justify-center border border-gray-100 flex-shrink-0 text-gray-400">
+                        <div className="h-12 w-12 bg-gray-50 rounded-lg flex items-center justify-center border border-gray-100 flex-shrink-0 text-gray-400 overflow-hidden">
                           {logoUrl ? (
-                            <img src={logoUrl} alt={org?.name} className="h-full w-full object-contain p-1" />
+                            <img src={logoUrl} alt={org?.name} className="h-full w-full object-contain" />
                           ) : (
                             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -127,19 +124,11 @@ export default function MyApplicationsPage() {
                         <div>
                           <p className="font-bold text-lg text-gray-900">{job?.role}</p>
                           <p className="text-sm text-gray-600">{org?.name}</p>
-                          <p className="text-xs text-gray-400 mt-1">
-                            Applied {new Date(app.created).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-4 sm:justify-end">
-                        {needsAction && (
-                          <span className="px-3 py-1 text-xs font-bold rounded-full bg-orange-100 text-orange-800 border border-orange-300 animate-pulse">
-                            Action Required
-                          </span>
-                        )}
-                        <span className={`px-3 py-1 text-xs font-bold rounded-full border ${status.bgClass} ${status.textClass} ${status.borderClass}`}>
-                          {status.text}
+                        <span className={`px-3 py-1 text-xs font-bold rounded-full border ${getStatusColor(app.stage)}`}>
+                          {app.stage}
                         </span>
                         <svg className="w-5 h-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

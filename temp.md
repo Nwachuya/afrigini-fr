@@ -1,4 +1,3 @@
-cat <<'EOF' > src/app/applicant/applications/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -113,7 +112,7 @@ export default function MyApplicationsPage() {
               
               return (
                 <li key={app.id} className="p-6 hover:bg-gray-50 transition-colors">
-                  <Link href={`/applicant/applications/${app.id}`} className="block">
+                  <Link href={`/my-applications/${app.id}`} className="block">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="flex items-center gap-4">
                         <div className="h-12 w-12 bg-gray-50 rounded-lg flex items-center justify-center border border-gray-100 flex-shrink-0 text-gray-400">
@@ -157,4 +156,3 @@ export default function MyApplicationsPage() {
     </div>
   );
 }
-EOF

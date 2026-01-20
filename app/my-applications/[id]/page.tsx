@@ -6,6 +6,7 @@ import Link from 'next/link';
 import pb from '@/lib/pocketbase';
 import { UserRecord, JobApplicationRecord } from '@/types';
 
+// Local Interface Definitions
 interface ExpandedJob {
   id: string;
   role: string;
@@ -23,7 +24,8 @@ interface ExpandedJob {
   };
 }
 
-interface ExpandedApplication extends JobApplicationRecord {
+// FIX: Use Omit to prevent conflict with global JobApplicationRecord
+interface ExpandedApplication extends Omit<JobApplicationRecord, 'expand'> {
   expand: {
     job: ExpandedJob;
     applicant: { id: string; firstName: string; lastName: string; user: string };
@@ -82,13 +84,14 @@ export default function ApplicationDetailPage() {
         });
 
         const expandedResult = result as unknown as ExpandedApplication;
+        // Security check: ensure this application belongs to the logged-in user
         if (expandedResult.expand?.applicant?.user !== user.id) {
           router.push('/my-applications');
           return;
         }
         setApplication(expandedResult);
 
-        // Check for existing video - don't set error if not found
+        // Check for existing video
         try {
           const existingVideo = await pb.collection('video_submissions').getFirstListItem(
             `application = "${applicationId}"`,
@@ -96,7 +99,6 @@ export default function ApplicationDetailPage() {
           );
           setVideoSubmission(existingVideo as unknown as VideoSubmission);
         } catch (e: any) {
-          // 404 means no video yet - that's fine, not an error
           if (e?.status !== 404) {
             console.error("Error checking video submission:", e);
           }
@@ -154,12 +156,15 @@ export default function ApplicationDetailPage() {
     if (!streamRef.current) return;
 
     chunksRef.current = [];
-    const options = { mimeType: 'video/webm;codecs=vp9,opus' };
+    // Try VP9, fallback to default
+    let options: MediaRecorderOptions = { mimeType: 'video/webm;codecs=vp9,opus' };
+    if (!MediaRecorder.isTypeSupported(options.mimeType!)) {
+       options = { mimeType: 'video/webm' }; // Fallback
+    }
     
     try {
       mediaRecorderRef.current = new MediaRecorder(streamRef.current, options);
     } catch (e) {
-      // Fallback for browsers that don't support vp9
       mediaRecorderRef.current = new MediaRecorder(streamRef.current);
     }
 
@@ -237,6 +242,7 @@ export default function ApplicationDetailPage() {
         return;
       }
 
+      // Fake progress for UX
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => Math.min(prev + 10, 90));
       }, 500);
@@ -248,6 +254,7 @@ export default function ApplicationDetailPage() {
       setVideoSubmission(result as unknown as VideoSubmission);
       setSuccess('Video submitted successfully! Your application is now under review.');
 
+      // Refresh app data
       const updatedApp = await pb.collection('job_applications').getOne(applicationId, {
         expand: 'job.organization,job.department,applicant',
       });
