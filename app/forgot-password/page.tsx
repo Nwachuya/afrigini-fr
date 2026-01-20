@@ -27,15 +27,15 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row h-full min-h-[calc(100vh-64px)]">
+    <div className="flex flex-col lg:flex-row h-full min-h-[calc(100vh-80px)]">
       
       {/* LEFT COLUMN: Form */}
-      <div className="w-full lg:w-1/2 flex flex-col justify-center p-8 md:p-16 lg:p-24 bg-white">
-        <div className="max-w-md w-full mx-auto">
+      <div className="w-full lg:w-1/2 flex flex-col justify-center items-start p-8 md:p-16 lg:p-24 bg-white z-10">
+        <div className="max-w-md w-full">
           
           <div className="mb-10">
-            <span className="text-blue-600 font-bold tracking-widest uppercase text-xs mb-2 block">Security Protocol</span>
-            <h1 className="text-4xl font-black text-gray-900 tracking-tight">RECOVER ACCESS</h1>
+            <span className="text-brand-green font-bold tracking-widest uppercase text-xs mb-2 block">Security Protocol</span>
+            <h1 className="text-4xl font-bold text-brand-dark tracking-tight">Recover Access</h1>
             <p className="text-gray-500 mt-2">Enter your registered email to receive reset instructions.</p>
           </div>
 
@@ -69,7 +69,7 @@ export default function ForgotPasswordPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-medium"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-brand-green focus:border-brand-green outline-none transition-all font-medium text-gray-900"
                   placeholder="name@company.com"
                 />
               </div>
@@ -77,7 +77,7 @@ export default function ForgotPasswordPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-lg shadow-blue-200 transition-all disabled:opacity-70 flex justify-center items-center gap-2 uppercase tracking-wide text-sm"
+                className="w-full py-4 bg-brand-green hover:bg-green-800 text-white font-bold rounded-xl shadow-lg hover:shadow-green-900/20 transition-all disabled:opacity-70 flex justify-center items-center gap-2 uppercase tracking-wide text-sm"
               >
                 {loading ? (
                   <>
@@ -103,21 +103,21 @@ export default function ForgotPasswordPage() {
       </div>
 
       {/* RIGHT COLUMN: Image */}
-      <div className="hidden lg:block w-1/2 relative bg-gray-900 overflow-hidden">
+      <div className="hidden lg:block w-1/2 relative bg-brand-dark overflow-hidden">
         <img 
           src="https://images.unsplash.com/photo-1555949963-ff9fe0c870eb?q=80&w=2070&auto=format&fit=crop" 
           alt="Secure Server" 
           className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-overlay"
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-900/90 via-black/80 to-black/90"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-brand-dark via-transparent to-transparent opacity-90"></div>
         
-        <div className="absolute bottom-16 left-16 max-w-md text-white">
-          <div className="flex items-center gap-2 mb-4 text-blue-400 text-xs font-bold uppercase tracking-widest">
-            <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+        <div className="absolute bottom-16 left-16 right-16 bg-white/10 backdrop-blur-md border border-white/20 p-8 rounded-2xl text-white shadow-2xl">
+          <div className="flex items-center gap-2 mb-4 text-green-300 text-xs font-bold uppercase tracking-widest">
+            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
             Identity Verification
           </div>
           <h2 className="text-3xl font-bold mb-4">Secure Account Recovery.</h2>
-          <p className="text-gray-400 leading-relaxed">
+          <p className="text-gray-300 leading-relaxed">
             Our automated systems ensure only authorized personnel can regain access to sensitive recruitment data.
           </p>
         </div>
