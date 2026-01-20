@@ -3,15 +3,18 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import pb from '@/lib/pocketbase';
-import { UserRecord, OrgMemberRecord, OrgInviteRecord } from '@/types';
+import { UserRecord, OrgInviteRecord } from '@/types';
 
-interface ExpandedMember extends OrgMemberRecord {
+// FIX: Standalone interface to prevent inheritance conflicts during build
+interface ExpandedMember {
+  id: string;
+  role: string;
   expand: {
     user: {
       id: string;
-      name: string;
+      name?: string;
       email: string;
-      avatar: string;
+      avatar?: string;
     };
   };
 }
@@ -62,18 +65,22 @@ export default function TeamPage() {
   }, [router]);
 
   const fetchData = async (orgId: string) => {
-    const membersRes = await pb.collection('org_members').getFullList({
-      filter: `organization = "${orgId}"`,
-      expand: 'user',
-      sort: 'role',
-    });
-    setMembers(membersRes as unknown as ExpandedMember[]);
+    try {
+      const membersRes = await pb.collection('org_members').getFullList({
+        filter: `organization = "${orgId}"`,
+        expand: 'user',
+        sort: 'role',
+      });
+      setMembers(membersRes as unknown as ExpandedMember[]);
 
-    const invitesRes = await pb.collection('org_invites').getFullList({
-      filter: `organization = "${orgId}"`,
-      sort: '-created',
-    });
-    setInvites(invitesRes as unknown as OrgInviteRecord[]);
+      const invitesRes = await pb.collection('org_invites').getFullList({
+        filter: `organization = "${orgId}"`,
+        sort: '-created',
+      });
+      setInvites(invitesRes as unknown as OrgInviteRecord[]);
+    } catch (e) {
+      console.error("Fetch error", e);
+    }
   };
 
   const handleInvite = async (e: React.FormEvent) => {
@@ -92,9 +99,10 @@ export default function TeamPage() {
       });
       setMessage({ text: `Invitation sent to ${inviteEmail}!`, type: 'success' });
       setInviteEmail('');
-      await fetchData(orgId); // Refresh lists
+      await fetchData(orgId);
     } catch (err: any) {
-      setMessage({ text: err.data?.data?.email?.message || err.message || 'Failed to send invite.', type: 'error' });
+      const errMsg = err?.data?.data?.email?.message || err.message || 'Failed to send invite.';
+      setMessage({ text: errMsg, type: 'error' });
     } finally {
       setInviting(false);
     }
@@ -167,23 +175,27 @@ export default function TeamPage() {
           <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
             <ul className="divide-y divide-gray-100">
               {members.map(member => {
-                const memberUser = member.expand?.user;
+                // Defensive coding: ensure user object exists in case of bad data
+                const memberUser = member.expand?.user || { id: 'unknown', name: 'Unknown', email: 'Unknown', avatar: '' };
+                const initial = memberUser.email?.[0]?.toUpperCase() || 'U';
+                const displayName = memberUser.name || memberUser.email;
+
                 return (
                   <li key={member.id} className="p-4 flex justify-between items-center">
                     <div className="flex items-center gap-4">
                       <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-600">
-                        {memberUser?.name?.[0] || memberUser?.email[0].toUpperCase()}
+                        {initial}
                       </div>
                       <div>
-                        <p className="font-semibold text-gray-900">{memberUser?.name || memberUser?.email}</p>
-                        <p className="text-sm text-gray-500">{memberUser?.email}</p>
+                        <p className="font-semibold text-gray-900">{displayName}</p>
+                        <p className="text-sm text-gray-500">{memberUser.email}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
                       <span className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded-full capitalize">
                         {member.role}
                       </span>
-                      {user?.id !== memberUser?.id && (
+                      {user?.id !== memberUser.id && (
                         <button className="text-red-500 hover:text-red-700 text-sm font-medium">
                           Remove
                         </button>
