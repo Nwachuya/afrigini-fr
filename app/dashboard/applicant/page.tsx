@@ -1,11 +1,13 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import pb from '@/lib/pocketbase';
 import { UserRecord, CandidateProfileRecord, JobRecord } from '@/types';
 import Link from 'next/link';
 
 export default function ApplicantDashboard() {
+  const router = useRouter();
   const [user, setUser] = useState<UserRecord | null>(null);
   const [profile, setProfile] = useState<CandidateProfileRecord | null>(null);
   const [stats, setStats] = useState({ applied: 0, interviews: 0, accepted: 0, videoRequests: 0, invites: 0 });
@@ -15,13 +17,23 @@ export default function ApplicantDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        if (!pb.authStore.isValid) return;
+        if (!pb.authStore.isValid) {
+          router.replace('/login');
+          return;
+        }
 
-        // 1. Re-fetch user record
         const freshUser = await pb.collection('users').getOne(pb.authStore.model!.id);
-        setUser(freshUser as unknown as UserRecord);
+        const userRecord = freshUser as unknown as UserRecord;
+        
+        // SECURITY CHECK: Redirect if not an Applicant
+        if (userRecord.role !== 'Applicant') {
+          router.replace('/dashboard/organization');
+          return;
+        }
 
-        // 2. Fetch candidate profile
+        setUser(userRecord);
+
+        // ... (Rest of the logic remains the same) ...
         let candidateProfile: CandidateProfileRecord | null = null;
         try {
           candidateProfile = await pb.collection('candidate_profiles').getFirstListItem(
@@ -30,11 +42,8 @@ export default function ApplicantDashboard() {
           setProfile(candidateProfile);
         } catch(e) {
           console.log("No profile record found.");
-          setLoading(false);
-          return; 
         }
 
-        // 3. Fetch stats if profile exists
         if (candidateProfile) {
           const profileId = candidateProfile.id;
           const filter = `applicant = "${profileId}"`;
@@ -58,7 +67,6 @@ export default function ApplicantDashboard() {
             invites: invitesRes.totalItems,
           });
 
-          // 4. Fetch Recommendations
           const appliedJobIds = allApplicationsRes.map(app => app.job);
           const preferredDeptIds = candidateProfile.preference || [];
 
@@ -89,10 +97,10 @@ export default function ApplicantDashboard() {
     };
 
     fetchData();
-  }, []);
+  }, [router]);
 
   if (loading) return <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center text-gray-500">Loading dashboard...</div>;
-  if (!user) return <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center text-gray-500">Please log in.</div>;
+  if (!user) return null; // Will redirect
 
   const avatarUrl = user.avatar 
     ? `${process.env.NEXT_PUBLIC_POCKETBASE_URL}/api/files/users/${user.id}/${user.avatar}` 
