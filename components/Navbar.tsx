@@ -76,6 +76,10 @@ export default function Navbar() {
                   <Link href="/dashboard/organization" className="hover:text-brand-green transition-colors">Dashboard</Link>
                   <Link href="/manage-jobs" className="hover:text-brand-green transition-colors">Manage Jobs</Link>
                   <Link href="/applications" className="hover:text-brand-green transition-colors">Applications</Link>
+                  <Link href="/find-candidates" className="hover:text-brand-green transition-colors">Find Candidates</Link>
+                  <Link href="/manage-jobs/new" className="hover:text-brand-green transition-colors">Add Job</Link>
+
+
                 </div>
               )}
 
