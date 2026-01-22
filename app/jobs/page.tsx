@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import pb from '@/lib/pocketbase';
-import { JobRecord, DepartmentRecord } from '@/types';
+import { JobRecord, DepartmentRecord, UserRecord, CandidateProfileRecord } from '@/types';
 
 export default function JobsPage() {
   // Data State
@@ -12,25 +12,58 @@ export default function JobsPage() {
   const [loading, setLoading] = useState(true);
   const [totalItems, setTotalItems] = useState(0);
   
+  // User State
+  const [appliedJobIds, setAppliedJobIds] = useState<string[]>([]);
+  const [user, setUser] = useState<UserRecord | null>(null);
+  
   // Filter State
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
+  const [hideApplied, setHideApplied] = useState(false); // New Filter
 
   const PER_PAGE = 10;
 
-  // 1. Fetch Departments on Mount
+  // 1. Initial Data Fetch (Depts, User, Applied Jobs)
   useEffect(() => {
-    const fetchDepts = async () => {
+    const initData = async () => {
       try {
-        const result = await pb.collection('departments').getFullList({ sort: 'department' });
-        setDepartments(result as unknown as DepartmentRecord[]);
+        // Fetch Depts
+        const depts = await pb.collection('departments').getFullList({ sort: 'department' });
+        setDepartments(depts as unknown as DepartmentRecord[]);
+
+        // Check User & Applications
+        if (pb.authStore.isValid) {
+          const currentUser = pb.authStore.model as unknown as UserRecord;
+          setUser(currentUser);
+
+          if (currentUser.role === 'Applicant') {
+            try {
+              // Get Profile
+              const profile = await pb.collection('candidate_profiles').getFirstListItem(
+                `user = "${currentUser.id}"`, 
+                { requestKey: null }
+              );
+              
+              // Get All Applications for this profile (just the job IDs)
+              const apps = await pb.collection('job_applications').getFullList({
+                filter: `applicant = "${profile.id}"`,
+                fields: 'job', // Optimization: only fetch job ID
+                requestKey: null
+              });
+              
+              setAppliedJobIds(apps.map((a: any) => a.job));
+            } catch (e) {
+              // No profile or no apps, ignore
+            }
+          }
+        }
       } catch (e) {
-        console.error("Failed to load departments", e);
+        console.error("Failed to load initial data", e);
       }
     };
-    fetchDepts();
+    initData();
   }, []);
 
   // 2. Fetch Jobs whenever filters or page changes
@@ -55,12 +88,20 @@ export default function JobsPage() {
           constraints.push(`(${deptQuery})`);
         }
 
+        // New Filter: Hide Applied
+        if (hideApplied && appliedJobIds.length > 0) {
+          // Construct a "NOT IN" query: id != 'id1' && id != 'id2'
+          const excludeQuery = appliedJobIds.map(id => `id != "${id}"`).join(' && ');
+          constraints.push(`(${excludeQuery})`);
+        }
+
         const filterString = constraints.join(' && ');
 
         const result = await pb.collection('jobs').getList(page, PER_PAGE, {
           filter: filterString,
           sort: '-created',
           expand: 'organization,department',
+          requestKey: null // Prevent auto-cancel issues
         });
 
         setJobs(result.items as unknown as JobRecord[]);
@@ -77,7 +118,7 @@ export default function JobsPage() {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [page, searchTerm, selectedTypes, selectedDepts]);
+  }, [page, searchTerm, selectedTypes, selectedDepts, hideApplied, appliedJobIds]);
 
   // Handlers
   const handleTypeToggle = (type: string) => {
@@ -129,6 +170,21 @@ export default function JobsPage() {
               </svg>
             </div>
           </div>
+
+          {/* Application Status Filter (Only for Applicants) */}
+          {user?.role === 'Applicant' && (
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={hideApplied}
+                  onChange={(e) => { setPage(1); setHideApplied(e.target.checked); }}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <span className="text-sm font-medium text-blue-800">Hide jobs I've applied to</span>
+              </label>
+            </div>
+          )}
 
           {/* Job Type Filter */}
           <div>
@@ -185,7 +241,7 @@ export default function JobsPage() {
               <h3 className="text-lg font-medium text-gray-900">No jobs found</h3>
               <p className="text-gray-500">Try adjusting your filters.</p>
               <button 
-                onClick={() => { setSearchTerm(''); setSelectedTypes([]); setSelectedDepts([]); }}
+                onClick={() => { setSearchTerm(''); setSelectedTypes([]); setSelectedDepts([]); setHideApplied(false); }}
                 className="mt-4 text-blue-600 hover:text-blue-800 font-medium text-sm"
               >
                 Clear all filters
@@ -203,10 +259,12 @@ export default function JobsPage() {
                   const logoUrl = org?.logo 
                     ? `${process.env.NEXT_PUBLIC_POCKETBASE_URL}/api/files/organizations/${org.id}/${org.logo}`
                     : null;
+                  
+                  const isApplied = appliedJobIds.includes(job.id);
 
                   return (
                     <Link key={job.id} href={`/jobs/${job.id}`} className="block group">
-                      <div className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-all duration-200 flex flex-col md:flex-row md:items-center gap-6">
+                      <div className={`bg-white border rounded-xl p-6 hover:shadow-md transition-all duration-200 flex flex-col md:flex-row md:items-center gap-6 ${isApplied ? 'border-green-200 bg-green-50/30' : 'border-gray-200'}`}>
                         {/* Company Logo */}
                         <div className="h-16 w-16 bg-gray-50 rounded-lg flex items-center justify-center flex-shrink-0 border border-gray-100 overflow-hidden text-gray-400">
                           {logoUrl ? (
@@ -220,9 +278,17 @@ export default function JobsPage() {
 
                         {/* Job Info */}
                         <div className="flex-grow">
-                          <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
-                            {job.role}
-                          </h3>
+                          <div className="flex items-center gap-3">
+                            <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+                              {job.role}
+                            </h3>
+                            {isApplied && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                                <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                Applied
+                              </span>
+                            )}
+                          </div>
                           <p className="text-gray-600 font-medium">{org?.name || 'Confidential Company'}</p>
                           
                           <div className="flex flex-wrap gap-3 mt-3 text-sm text-gray-500">
@@ -234,7 +300,7 @@ export default function JobsPage() {
                               {job.type}
                             </span>
 
-                            {/* Salary - FIXED: Safe check for undefined */}
+                            {/* Salary */}
                             {(job.salary ?? 0) > 0 && (
                               <span className="flex items-center gap-1.5 bg-green-50 text-green-700 px-2.5 py-1 rounded border border-green-100">
                                 <svg className="h-3.5 w-3.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -258,9 +324,15 @@ export default function JobsPage() {
 
                         {/* Action */}
                         <div className="flex-shrink-0 self-start md:self-center">
-                          <span className="px-5 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg group-hover:bg-blue-50 group-hover:text-blue-700 group-hover:border-blue-200 transition-colors">
-                            View Details
-                          </span>
+                          {isApplied ? (
+                            <span className="px-5 py-2 bg-green-100 text-green-800 font-medium rounded-lg border border-green-200">
+                              View Status
+                            </span>
+                          ) : (
+                            <span className="px-5 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg group-hover:bg-blue-50 group-hover:text-blue-700 group-hover:border-blue-200 transition-colors">
+                              View Details
+                            </span>
+                          )}
                         </div>
                       </div>
                     </Link>
