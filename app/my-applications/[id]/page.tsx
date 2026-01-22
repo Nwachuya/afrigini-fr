@@ -24,7 +24,6 @@ interface ExpandedJob {
   };
 }
 
-// FIX: Use Omit to prevent conflict with global JobApplicationRecord
 interface ExpandedApplication extends Omit<JobApplicationRecord, 'expand'> {
   expand: {
     job: ExpandedJob;
@@ -62,6 +61,7 @@ export default function ApplicationDetailPage() {
   const [recordingTime, setRecordingTime] = useState(0);
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [recordedMimeType, setRecordedMimeType] = useState<string>('video/webm');
 
   const videoPreviewRef = useRef<HTMLVideoElement>(null);
   const videoPlaybackRef = useRef<HTMLVideoElement>(null);
@@ -73,47 +73,50 @@ export default function ApplicationDetailPage() {
   const MAX_RECORDING_TIME = 180; // 3 minutes
 
   useEffect(() => {
-    const loadApplication = async () => {
+    const loadData = async () => {
       try {
         const user = pb.authStore.model as unknown as UserRecord;
         if (!user || user.role !== 'Applicant') { router.push('/login'); return; }
         if (!applicationId) { router.push('/my-applications'); return; }
 
+        // 1. Fetch Application
         const result = await pb.collection('job_applications').getOne(applicationId, {
           expand: 'job.organization,job.department,applicant',
+          requestKey: null
         });
 
         const expandedResult = result as unknown as ExpandedApplication;
-        // Security check: ensure this application belongs to the logged-in user
         if (expandedResult.expand?.applicant?.user !== user.id) {
           router.push('/my-applications');
           return;
         }
         setApplication(expandedResult);
 
-        // Check for existing video
+        // 2. Fetch Video
         try {
-          const existingVideo = await pb.collection('video_submissions').getFirstListItem(
-            `application = "${applicationId}"`,
-            { requestKey: null }
-          );
-          setVideoSubmission(existingVideo as unknown as VideoSubmission);
-        } catch (e: any) {
-          if (e?.status !== 404) {
-            console.error("Error checking video submission:", e);
+          const videoRes = await pb.collection('video_submissions').getList(1, 1, {
+            filter: `application = "${applicationId}"`,
+            requestKey: null
+          });
+
+          if (videoRes.items.length > 0) {
+            setVideoSubmission(videoRes.items[0] as unknown as VideoSubmission);
           }
+        } catch (videoErr) {
+          console.warn("Video check failed (ignoring):", videoErr);
         }
-      } catch (err) {
-        console.error("Error loading application:", err);
-        setError("Failed to load application details.");
+
+      } catch (err: any) {
+        console.error("Critical Error loading application:", err);
+        setError(err.message || "Failed to load application details.");
       } finally {
         setLoading(false);
       }
     };
-    loadApplication();
+
+    loadData();
   }, [applicationId, router]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       stopCamera();
@@ -156,15 +159,21 @@ export default function ApplicationDetailPage() {
     if (!streamRef.current) return;
 
     chunksRef.current = [];
-    // Try VP9, fallback to default
-    let options: MediaRecorderOptions = { mimeType: 'video/webm;codecs=vp9,opus' };
-    if (!MediaRecorder.isTypeSupported(options.mimeType!)) {
-       options = { mimeType: 'video/webm' }; // Fallback
+    
+    // Determine supported mime type
+    let mimeType = 'video/webm';
+    if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')) {
+      mimeType = 'video/webm;codecs=vp9,opus';
+    } else if (MediaRecorder.isTypeSupported('video/mp4')) {
+      mimeType = 'video/mp4'; // Safari support
     }
     
+    setRecordedMimeType(mimeType);
+    
     try {
-      mediaRecorderRef.current = new MediaRecorder(streamRef.current, options);
+      mediaRecorderRef.current = new MediaRecorder(streamRef.current, { mimeType });
     } catch (e) {
+      // Fallback
       mediaRecorderRef.current = new MediaRecorder(streamRef.current);
     }
 
@@ -173,7 +182,8 @@ export default function ApplicationDetailPage() {
     };
 
     mediaRecorderRef.current.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+      // Create blob with the actual mime type used
+      const blob = new Blob(chunksRef.current, { type: chunksRef.current[0]?.type || 'video/webm' });
       setRecordedBlob(blob);
       const url = URL.createObjectURL(blob);
       setRecordedUrl(url);
@@ -232,7 +242,9 @@ export default function ApplicationDetailPage() {
       formData.append('application', application.id);
 
       if (uploadMethod === 'record' && recordedBlob) {
-        const file = new File([recordedBlob], 'video-intro.webm', { type: 'video/webm' });
+        // Determine extension based on mime type
+        const ext = recordedBlob.type.includes('mp4') ? 'mp4' : 'webm';
+        const file = new File([recordedBlob], `video-intro.${ext}`, { type: recordedBlob.type });
         formData.append('video_file', file);
       } else if (uploadMethod === 'url' && videoUrl.trim()) {
         formData.append('video_url', videoUrl.trim());
@@ -242,7 +254,6 @@ export default function ApplicationDetailPage() {
         return;
       }
 
-      // Fake progress for UX
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => Math.min(prev + 10, 90));
       }, 500);
@@ -254,7 +265,6 @@ export default function ApplicationDetailPage() {
       setVideoSubmission(result as unknown as VideoSubmission);
       setSuccess('Video submitted successfully! Your application is now under review.');
 
-      // Refresh app data
       const updatedApp = await pb.collection('job_applications').getOne(applicationId, {
         expand: 'job.organization,job.department,applicant',
       });
@@ -266,7 +276,9 @@ export default function ApplicationDetailPage() {
       setVideoUrl('');
     } catch (err: any) {
       console.error("Error uploading video:", err);
-      setError(err?.message || 'Failed to upload video. Please try again.');
+      // Show detailed error if available
+      const msg = err?.data?.data?.video_file?.message || err?.message || 'Failed to upload video. Check file size limits.';
+      setError(msg);
     } finally {
       setUploading(false);
     }

@@ -17,16 +17,22 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
 
+    console.log("Submitting login for:", email);
+
     try {
       const user = await login(email, password);
+      console.log("Login successful:", user);
+      
+      // Force a hard redirect to ensure state updates
       if (user.role === 'Applicant') {
-        router.push('/dashboard/applicant');
+        window.location.href = '/dashboard/applicant';
       } else {
-        router.push('/dashboard/organization');
+        window.location.href = '/dashboard/organization';
       }
     } catch (err: any) {
-      setError("Invalid email or password.");
-    } finally {
+      console.error("Login error:", err);
+      // Display the actual error message from PocketBase if available
+      setError(err.message || "Invalid email or password.");
       setLoading(false);
     }
   };
@@ -121,12 +127,12 @@ export default function LoginPage() {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-brand-dark via-transparent to-transparent opacity-90"></div>
         
-        <div className="absolute bottom-16 left-16 right-16 bg-white/10 backdrop-blur-md border border-white/20 p-8 rounded-2xl text-white shadow-2xl">
+        <div className="absolute bottom-16 left-16 max-w-md text-white">
           <div className="flex items-center gap-2 mb-4 text-green-300 text-xs font-bold uppercase tracking-widest">
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
             System Operational
           </div>
-          <h2 className="text-3xl font-bold mb-4">Secure. Verified. Professional.</h2>
+          <h2 className="text-3xl font-bold mb-4">Precision Talent Intelligence.</h2>
           <p className="text-gray-300 leading-relaxed">
             Log in to access high-fidelity risk extraction and deep-scan assessment tools.
           </p>
