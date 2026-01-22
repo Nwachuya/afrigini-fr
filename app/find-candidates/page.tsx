@@ -27,6 +27,10 @@ export default function FindCandidatesPage() {
   const [sendingInvite, setSendingInvite] = useState(false);
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
   const [inviteError, setInviteError] = useState<string | null>(null);
+  
+  // Logic to filter dropdown
+  const [checkingEligibility, setCheckingEligibility] = useState(false);
+  const [eligibleJobs, setEligibleJobs] = useState<JobRecord[]>([]);
 
   const PER_PAGE = 10;
 
@@ -35,7 +39,6 @@ export default function FindCandidatesPage() {
       try {
         const user = pb.authStore.model as unknown as UserRecord;
         
-        // 1. Get User's Org
         if (user) {
           try {
             const memberRes = await pb.collection('org_members').getFirstListItem(
@@ -45,7 +48,7 @@ export default function FindCandidatesPage() {
             if (memberRes) {
               setOrgId(memberRes.organization);
               
-              // 2. Fetch My Open Jobs
+              // Fetch ALL Open Jobs for the Org
               const jobsRes = await pb.collection('jobs').getFullList({
                 filter: `organization = "${memberRes.organization}" && stage = "Open"`,
                 sort: '-created',
@@ -64,7 +67,7 @@ export default function FindCandidatesPage() {
     init();
   }, []);
 
-  // Fetch Candidates when filters change
+  // Fetch Candidates
   useEffect(() => {
     const fetchCandidates = async () => {
       setLoading(true);
@@ -72,7 +75,6 @@ export default function FindCandidatesPage() {
         const constraints = ['is_open_to_work = true'];
 
         if (searchTerm) {
-          // Search name, headline, or skills
           constraints.push(`(firstName ~ "${searchTerm}" || lastName ~ "${searchTerm}" || headline ~ "${searchTerm}" || skills ~ "${searchTerm}")`);
         }
 
@@ -102,6 +104,52 @@ export default function FindCandidatesPage() {
     return () => clearTimeout(timeoutId);
   }, [page, searchTerm, locationFilter]);
 
+  // When opening modal, calculate eligible jobs
+  useEffect(() => {
+    const checkEligibility = async () => {
+      if (!selectedCandidate || !orgId) return;
+
+      setCheckingEligibility(true);
+      setEligibleJobs([]); // Reset
+      
+      try {
+        // 1. Get jobs this candidate has ALREADY applied to
+        const existingApps = await pb.collection('job_applications').getFullList({
+          filter: `applicant = "${selectedCandidate.id}"`,
+          fields: 'job',
+          requestKey: null
+        });
+        const appliedJobIds = existingApps.map((a: any) => a.job);
+
+        // 2. Get jobs this candidate has ALREADY been invited to
+        const existingInvites = await pb.collection('job_invitations').getFullList({
+          filter: `candidate_profile = "${selectedCandidate.id}"`,
+          fields: 'job',
+          requestKey: null
+        });
+        const invitedJobIds = existingInvites.map((i: any) => i.job);
+
+        // 3. Filter myJobs
+        const available = myJobs.filter(job => 
+          !appliedJobIds.includes(job.id) && !invitedJobIds.includes(job.id)
+        );
+
+        setEligibleJobs(available);
+        if (available.length > 0) setSelectedJobId(available[0].id);
+        else setSelectedJobId('');
+
+      } catch (err) {
+        console.error("Error checking eligibility", err);
+      } finally {
+        setCheckingEligibility(false);
+      }
+    };
+
+    if (selectedCandidate) {
+      checkEligibility();
+    }
+  }, [selectedCandidate, myJobs, orgId]);
+
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!orgId || !selectedJobId || !selectedCandidate) return;
@@ -110,27 +158,6 @@ export default function FindCandidatesPage() {
     setInviteError(null);
     
     try {
-      // 1. Check if already applied
-      const existingApp = await pb.collection('job_applications').getList(1, 1, {
-        filter: `job = "${selectedJobId}" && applicant = "${selectedCandidate.id}"`,
-        requestKey: null
-      });
-
-      if (existingApp.totalItems > 0) {
-        throw new Error("This candidate has already applied to this job.");
-      }
-
-      // 2. Check if already invited
-      const existingInvite = await pb.collection('job_invitations').getList(1, 1, {
-        filter: `job = "${selectedJobId}" && candidate_profile = "${selectedCandidate.id}"`,
-        requestKey: null
-      });
-
-      if (existingInvite.totalItems > 0) {
-        throw new Error("You have already invited this candidate to this job.");
-      }
-
-      // 3. Send Invite
       await pb.collection('job_invitations').create({
         organization: orgId,
         job: selectedJobId,
@@ -220,10 +247,6 @@ export default function FindCandidatesPage() {
                 if (Array.isArray(candidate.skills)) skillTags = candidate.skills;
                 else if (typeof candidate.skills === 'string') skillTags = (candidate.skills as string).split(',');
 
-                const avatarUrl = candidate.user // Assuming user relation is expanded or we construct URL if we had avatar field on profile
-                  ? null // Profile doesn't store avatar directly, User does. For MVP we use initials.
-                  : null;
-
                 return (
                   <div key={candidate.id} className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col h-full">
                     {/* Profile Header */}
@@ -270,12 +293,7 @@ export default function FindCandidatesPage() {
                             alert("You must represent an organization to invite candidates.");
                             return;
                           }
-                          if (myJobs.length === 0) {
-                            alert("You have no open jobs to invite this candidate to.");
-                            return;
-                          }
                           setSelectedCandidate(candidate);
-                          if (myJobs.length > 0) setSelectedJobId(myJobs[0].id);
                         }}
                         className="w-full py-2.5 bg-white border border-brand-green text-brand-green font-bold rounded-lg hover:bg-green-50 transition-colors flex items-center justify-center gap-2"
                       >
@@ -354,18 +372,26 @@ export default function FindCandidatesPage() {
                     </div>
                   )}
 
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">Select Job</label>
-                    <select 
-                      value={selectedJobId}
-                      onChange={(e) => setSelectedJobId(e.target.value)}
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-brand-green outline-none bg-white"
-                    >
-                      {myJobs.map(job => (
-                        <option key={job.id} value={job.id}>{job.role}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {checkingEligibility ? (
+                    <div className="text-center py-4 text-gray-500 text-sm">Checking eligible jobs...</div>
+                  ) : eligibleJobs.length === 0 ? (
+                    <div className="bg-yellow-50 p-4 rounded-lg text-sm text-yellow-800 border border-yellow-200">
+                      You have no open jobs available for this candidate. They may have already applied or been invited to all your open roles.
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">Select Job</label>
+                      <select 
+                        value={selectedJobId}
+                        onChange={(e) => setSelectedJobId(e.target.value)}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-brand-green outline-none bg-white"
+                      >
+                        {eligibleJobs.map(job => (
+                          <option key={job.id} value={job.id}>{job.role}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-sm font-bold text-gray-700 mb-2">Message (Optional)</label>
@@ -389,8 +415,8 @@ export default function FindCandidatesPage() {
                   </button>
                   <button 
                     type="submit"
-                    disabled={sendingInvite}
-                    className="px-4 py-2 bg-brand-green text-white font-bold rounded-lg hover:bg-green-800 transition-colors disabled:opacity-70"
+                    disabled={sendingInvite || eligibleJobs.length === 0}
+                    className="px-4 py-2 bg-brand-green text-white font-bold rounded-lg hover:bg-green-800 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
                   >
                     {sendingInvite ? 'Sending...' : 'Send Invitation'}
                   </button>
