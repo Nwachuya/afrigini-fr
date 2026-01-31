@@ -13,6 +13,7 @@
     "pocketbase": "^0.21.1",
     "react": "^18",
     "react-dom": "^18",
+    "sharp": "^0.34.5",
     "stripe": "^20.3.0"
   },
   "devDependencies": {
