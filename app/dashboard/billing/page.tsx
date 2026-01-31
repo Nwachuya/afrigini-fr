@@ -1,8 +1,6 @@
-// /app/dashboard/billing/page.tsx
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import pb from '@/lib/pocketbase';
 import { UserRecord } from '@/types';
@@ -15,7 +13,16 @@ interface Plan {
   price_id: string;
 }
 
-export default function BillingPage() {
+interface Payment {
+  id: string;
+  amount: number;
+  status: string;
+  invoice_url: string;
+  created: string;
+  payer_email: string;
+}
+
+function BillingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -28,9 +35,16 @@ export default function BillingPage() {
   const [userEmail, setUserEmail] = useState('');
   const [credits, setCredits] = useState<number>(0);
   const [plans, setPlans] = useState<Plan[]>([]);
+  
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [paymentsPage, setPaymentsPage] = useState(1);
+  const [totalPayments, setTotalPayments] = useState(0);
+  const [loadingPayments, setLoadingPayments] = useState(false);
+  const perPage = 5;
+  
+  const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check for success/cancel from Stripe redirect
     if (searchParams.get('success') === 'true') {
       setMessage({ text: 'Payment successful! Credits have been added.', type: 'success' });
     } else if (searchParams.get('canceled') === 'true') {
@@ -63,7 +77,6 @@ export default function BillingPage() {
           setMessage({ text: 'No organization found.', type: 'error' });
         }
 
-        // Load plans
         const plansRes = await pb.collection('plans').getFullList<Plan>({
           sort: 'cost',
           requestKey: null,
@@ -78,6 +91,28 @@ export default function BillingPage() {
     };
     loadBilling();
   }, [router]);
+
+  useEffect(() => {
+    if (!orgId) return;
+
+    const loadPayments = async () => {
+      setLoadingPayments(true);
+      try {
+        const res = await pb.collection('payments').getList<Payment>(paymentsPage, perPage, {
+          filter: `org_id = "${orgId}"`,
+          sort: '-created',
+          requestKey: null,
+        });
+        setPayments(res.items);
+        setTotalPayments(res.totalItems);
+      } catch (err) {
+        console.error("Error loading payments:", err);
+      } finally {
+        setLoadingPayments(false);
+      }
+    };
+    loadPayments();
+  }, [orgId, paymentsPage]);
 
   const handleBuyCredits = async (plan: Plan) => {
     if (!orgId) return;
@@ -103,7 +138,6 @@ export default function BillingPage() {
         throw new Error(data.error || 'Failed to create checkout session');
       }
 
-      // Redirect to Stripe
       window.location.href = data.url;
 
     } catch (err: any) {
@@ -112,6 +146,8 @@ export default function BillingPage() {
       setProcessing(null);
     }
   };
+
+  const totalPages = Math.ceil(totalPayments / perPage);
 
   if (loading) {
     return (
@@ -206,6 +242,126 @@ export default function BillingPage() {
           </div>
         </div>
       </div>
+
+      {/* Payment History */}
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
+        <div className="p-6 border-b border-gray-100">
+          <h2 className="text-lg font-semibold text-gray-900">Payment History</h2>
+        </div>
+        <div className="p-6">
+          {loadingPayments ? (
+            <p className="text-gray-500 text-center py-4">Loading payments...</p>
+          ) : payments.length === 0 ? (
+            <p className="text-gray-500 text-center py-4">No payments yet.</p>
+          ) : (
+            <>
+              <table className="w-full">
+                <thead>
+                  <tr className="text-left text-sm text-gray-500 border-b">
+                    <th className="pb-3 font-medium">Date</th>
+                    <th className="pb-3 font-medium">Amount</th>
+                    <th className="pb-3 font-medium">Status</th>
+                    <th className="pb-3 font-medium text-right">Invoice</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {payments.map((payment) => (
+                    <tr key={payment.id} className="border-b last:border-0">
+                      <td className="py-3 text-sm text-gray-900">
+                        {new Date(payment.created).toLocaleDateString()}
+                      </td>
+                      <td className="py-3 text-sm text-gray-900">
+                        ${(payment.amount / 100).toFixed(2)}
+                      </td>
+                      <td className="py-3">
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                          payment.status === 'allocated' 
+                            ? 'bg-green-100 text-green-700' 
+                            : 'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {payment.status}
+                        </span>
+                      </td>
+                      <td className="py-3 text-right">
+                        {payment.invoice_url ? (
+                          <button
+                            onClick={() => setInvoiceUrl(payment.invoice_url)}
+                            className="text-sm text-blue-600 hover:underline"
+                          >
+                            View Receipt
+                          </button>
+                        ) : (
+                          <span className="text-sm text-gray-400">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                  <p className="text-sm text-gray-500">
+                    Showing {((paymentsPage - 1) * perPage) + 1} to {Math.min(paymentsPage * perPage, totalPayments)} of {totalPayments}
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setPaymentsPage(p => Math.max(1, p - 1))}
+                      disabled={paymentsPage === 1}
+                      className="px-3 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={() => setPaymentsPage(p => Math.min(totalPages, p + 1))}
+                      disabled={paymentsPage === totalPages}
+                      className="px-3 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Invoice Modal */}
+      {invoiceUrl && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="font-semibold text-gray-900">Receipt</h3>
+              <button
+                onClick={() => setInvoiceUrl(null)}
+                className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="flex-1 p-4">
+              <iframe
+                src={invoiceUrl}
+                className="w-full h-full border rounded"
+                title="Receipt"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+export default function BillingPage() {
+  return (
+    <Suspense fallback={
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center text-gray-500">
+        Loading billing...
+      </div>
+    }>
+      <BillingContent />
+    </Suspense>
   );
 }

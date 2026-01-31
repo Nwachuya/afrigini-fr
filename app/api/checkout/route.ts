@@ -1,11 +1,9 @@
-// /app/api/checkout/route.ts
-
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import PocketBase from 'pocketbase';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16',
+  apiVersion: '2026-01-28.clover',
 });
 
 const pb = new PocketBase('https://pb.afrigini.com');
@@ -22,7 +20,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. GET ORGANIZATION
     let org;
     try {
       org = await pb.collection('organizations').getOne(orgId);
@@ -33,7 +30,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. GET OR CREATE STRIPE CUSTOMER
     let customerId = org.stripe_customer_id;
 
     if (!customerId) {
@@ -52,7 +48,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 3. CREATE CHECKOUT SESSION
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'payment',
