@@ -404,6 +404,7 @@ export default function JobDetailsPage() {
                 <label className="block text-sm text-gray-600 mb-1">Earliest Start Date</label>
                 <input 
                   type="date" 
+                  min={new Date().toISOString().split("T")[0]} // 👈 This line adds the restriction
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
