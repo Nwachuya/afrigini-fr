@@ -12,27 +12,40 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  const getErrorMessage = (err: any): string => {
+    const message = err?.message?.toLowerCase() || '';
+    
+    if (message.includes('failed to authenticate') || message.includes('invalid credentials')) {
+      return 'Invalid email or password. Please try again.';
+    }
+    if (message.includes('user not found') || message.includes('no user')) {
+      return 'No account found with this email address.';
+    }
+    if (message.includes('network') || message.includes('fetch')) {
+      return 'Unable to connect to server. Please check your connection.';
+    }
+    if (message.includes('too many requests') || message.includes('rate limit')) {
+      return 'Too many login attempts. Please wait a moment and try again.';
+    }
+    
+    return 'Something went wrong. Please try again.';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    console.log("Submitting login for:", email);
-
     try {
       const user = await login(email, password);
-      console.log("Login successful:", user);
       
-      // Force a hard redirect to ensure state updates
       if (user.role === 'Applicant') {
         window.location.href = '/dashboard/applicant';
       } else {
         window.location.href = '/dashboard/organization';
       }
     } catch (err: any) {
-      console.error("Login error:", err);
-      // Display the actual error message from PocketBase if available
-      setError(err.message || "Invalid email or password.");
+      setError(getErrorMessage(err));
       setLoading(false);
     }
   };
@@ -51,8 +64,11 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 text-sm text-red-700 font-medium">
-              {error}
+            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+              <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-sm text-red-700">{error}</p>
             </div>
           )}
 
@@ -99,7 +115,7 @@ export default function LoginPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Authenticating...
+                  Signing in...
                 </>
               ) : (
                 'Sign In'
@@ -121,20 +137,20 @@ export default function LoginPage() {
       {/* RIGHT COLUMN: Image */}
       <div className="hidden lg:block w-1/2 relative bg-brand-dark overflow-hidden">
         <img 
-          src="https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=2070&auto=format&fit=crop" 
-          alt="Security Technology" 
-          className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-overlay"
+          src="https://images.unsplash.com/photo-1600880292203-757bb62b4baf?q=80&w=2070&auto=format&fit=crop" 
+          alt="Professional team collaboration" 
+          className="absolute inset-0 w-full h-full object-cover opacity-50"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-brand-dark via-transparent to-transparent opacity-90"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-brand-dark via-brand-dark/50 to-transparent"></div>
         
-        <div className="absolute bottom-16 left-16 max-w-md text-white">
+        <div className="absolute bottom-16 left-16 right-16 text-white">
           <div className="flex items-center gap-2 mb-4 text-green-300 text-xs font-bold uppercase tracking-widest">
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-            System Operational
+            Africa's Talent Network
           </div>
-          <h2 className="text-3xl font-bold mb-4">Precision Talent Intelligence.</h2>
+          <h2 className="text-3xl font-bold mb-4">Connect with Top Opportunities.</h2>
           <p className="text-gray-300 leading-relaxed">
-            Log in to access high-fidelity risk extraction and deep-scan assessment tools.
+            Join thousands of professionals finding their next career move across Africa.
           </p>
         </div>
       </div>

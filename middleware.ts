@@ -14,16 +14,19 @@ export function middleware(request: NextRequest) {
   
   if (authCookie) {
     try {
-      // pb_auth cookie is base64 encoded JSON
-      const decoded = JSON.parse(atob(authCookie));
+      let cookieValue = authCookie;
       
-      // Check if token exists and model exists
-      if (decoded.token && decoded.model) {
+      if (cookieValue.startsWith('%7B')) {
+        cookieValue = decodeURIComponent(cookieValue);
+      }
+      
+      const parsed = JSON.parse(cookieValue);
+      
+      if (parsed.token && parsed.model) {
         isAuthenticated = true;
-        userRole = decoded.model.role || null;
+        userRole = parsed.model.role || null;
       }
     } catch (e) {
-      // Invalid cookie, treat as unauthenticated
       isAuthenticated = false;
     }
   }
@@ -42,25 +45,16 @@ export function middleware(request: NextRequest) {
   // Unauthenticated user on protected page → redirect to login
   if (!isAuthenticated && !isPublicPath) {
     const loginUrl = new URL('/login', request.url);
-    // Save the attempted URL to redirect back after login
     loginUrl.searchParams.set('redirect', pathname);
     
     return NextResponse.redirect(loginUrl);
   }
   
-  // Allow request to continue
   return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all paths except:
-     * - api routes
-     * - static files
-     * - _next
-     * - favicon
-     */
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|icon|.*\\..*).*)',
   ],
 };
