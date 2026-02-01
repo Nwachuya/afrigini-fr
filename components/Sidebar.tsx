@@ -73,9 +73,9 @@ export default function Sidebar({ user, userRole, isOpen, onToggle }: SidebarPro
 
   return (
     <>
-      {/* Sidebar */}
+      {/* Desktop Sidebar - Hidden on mobile */}
       <aside
-        className={`fixed top-0 left-0 h-full bg-white border-r border-gray-200 z-40 flex flex-col transition-all duration-200 ease-in-out ${
+        className={`hidden md:flex fixed top-0 left-0 h-full bg-white border-r border-gray-200 z-40 flex-col transition-all duration-200 ease-in-out ${
           isOpen ? 'w-60' : 'w-16'
         }`}
       >
@@ -144,24 +144,17 @@ export default function Sidebar({ user, userRole, isOpen, onToggle }: SidebarPro
               !isOpen ? 'justify-center' : ''
             }`}
           >
-            
-
             {user.avatar ? (
-            <img
-                src={`https://pb.afrigini.com/api/files/users/${user.id}/${user.avatar}`}
+              <img
+                src={`${process.env.NEXT_PUBLIC_POCKETBASE_URL}/api/files/users/${user.id}/${user.avatar}`}
                 alt="Avatar"
                 className="h-8 w-8 rounded-full object-cover flex-shrink-0"
-            />
+              />
             ) : (
-            <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+              <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
                 {initial}
-            </div>
+              </div>
             )}
-
-
-
-
-
             {isOpen && (
               <div className="overflow-hidden">
                 <p className="text-sm font-medium text-gray-900 truncate">{user.email}</p>
@@ -197,10 +190,10 @@ export default function Sidebar({ user, userRole, isOpen, onToggle }: SidebarPro
         </div>
       </aside>
 
-      {/* Edge toggle area */}
+      {/* Edge toggle area - Desktop only */}
       <div
         onClick={onToggle}
-        className={`fixed top-0 h-full w-1 cursor-ew-resize hover:bg-brand-green/20 transition-colors z-50 ${
+        className={`hidden md:block fixed top-0 h-full w-1 cursor-ew-resize hover:bg-brand-green/20 transition-colors z-50 ${
           isOpen ? 'left-60' : 'left-16'
         }`}
       />
