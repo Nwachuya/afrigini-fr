@@ -29,6 +29,13 @@ export default function JobDetailsPage() {
   const [coverLetterText, setCoverLetterText] = useState('');
   const [startDate, setStartDate] = useState('');
   
+  // Answer Fields
+  const [answerOne, setAnswerOne] = useState('');
+  const [answerTwo, setAnswerTwo] = useState('');
+  const [answerThree, setAnswerThree] = useState('');
+  const [answerFour, setAnswerFour] = useState('');
+  const [answerFive, setAnswerFive] = useState('');
+  
   // File Refs
   const resumeInputRef = useRef<HTMLInputElement>(null);
   const coverLetterInputRef = useRef<HTMLInputElement>(null);
@@ -92,12 +99,17 @@ export default function JobDetailsPage() {
     setResumeChoice(profile.resume ? 'existing' : 'new'); 
     setStartDate('');
     setCoverLetterText('');
+    setAnswerOne('');
+    setAnswerTwo('');
+    setAnswerThree('');
+    setAnswerFour('');
+    setAnswerFive('');
     setShowModal(true);
   };
 
   const handleSubmitApplication = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profile) return;
+    if (!profile || !job) return;
     
     setSubmitting(true);
     setError('');
@@ -108,7 +120,7 @@ export default function JobDetailsPage() {
       formData.append('applicant', profile.id);
       formData.append('stage', 'Applied');
       
-      // New Field: Earliest Start Date
+      // Earliest Start Date
       if (startDate) {
         formData.append('earliest_start_date', new Date(startDate).toISOString());
       }
@@ -129,6 +141,23 @@ export default function JobDetailsPage() {
         formData.append('cover_letter_file', coverLetterInputRef.current.files[0]);
       }
 
+      // Handle Answers
+      if (job.question_one && answerOne) {
+        formData.append('answer_one', answerOne);
+      }
+      if (job.question_two && answerTwo) {
+        formData.append('answer_two', answerTwo);
+      }
+      if (job.question_three && answerThree) {
+        formData.append('answer_three', answerThree);
+      }
+      if (job.question_four && answerFour) {
+        formData.append('answer_four', answerFour);
+      }
+      if (job.question_five && answerFive) {
+        formData.append('answer_five', answerFive);
+      }
+
       await pb.collection('job_applications').create(formData);
       
       setHasApplied(true);
@@ -140,6 +169,15 @@ export default function JobDetailsPage() {
       setSubmitting(false);
     }
   };
+
+  // Check if job has any screening questions
+  const hasQuestions = job && (
+    job.question_one || 
+    job.question_two || 
+    job.question_three || 
+    job.question_four || 
+    job.question_five
+  );
 
   if (loading) return <div className="max-w-7xl mx-auto px-4 py-20 text-center text-gray-500">Loading...</div>;
   if (!job) return <div className="max-w-7xl mx-auto px-4 py-20 text-center text-gray-500">Job not found.</div>;
@@ -187,13 +225,11 @@ export default function JobDetailsPage() {
                     </svg>
                     {job.type}
                   </span>
-                  {/* FIXED: Safe salary check */}
                   {(job.salary ?? 0) > 0 && (
                     <span className="flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1 rounded-full border border-green-100">
                       <svg className="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      {/* FIXED: Safe toLocaleString */}
                       {job.currency} {(job.salary ?? 0).toLocaleString()} / {job.paymentType}
                     </span>
                   )}
@@ -215,13 +251,19 @@ export default function JobDetailsPage() {
             {job.description && (
               <section>
                 <h2 className="text-xl font-bold text-gray-900 mb-4 border-b border-gray-100 pb-2">About the Role</h2>
-                <div className="prose max-w-none text-gray-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: job.description }} />
+                <div 
+                  className="prose prose-gray max-w-none prose-headings:font-semibold prose-headings:text-gray-900 prose-p:text-gray-600 prose-p:leading-relaxed prose-ul:text-gray-600 prose-ol:text-gray-600 prose-li:marker:text-gray-400 prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline prose-strong:text-gray-900"
+                  dangerouslySetInnerHTML={{ __html: job.description }} 
+                />
               </section>
             )}
             {job.benefits && (
               <section>
                 <h2 className="text-xl font-bold text-gray-900 mb-4 border-b border-gray-100 pb-2">Benefits & Perks</h2>
-                <div className="prose max-w-none text-gray-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: job.benefits }} />
+                <div 
+                  className="prose prose-gray max-w-none prose-headings:font-semibold prose-headings:text-gray-900 prose-p:text-gray-600 prose-p:leading-relaxed prose-ul:text-gray-600 prose-ol:text-gray-600 prose-li:marker:text-gray-400 prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline prose-strong:text-gray-900"
+                  dangerouslySetInnerHTML={{ __html: job.benefits }} 
+                />
               </section>
             )}
           </div>
@@ -265,7 +307,7 @@ export default function JobDetailsPage() {
       {/* APPLICATION MODAL */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-fade-in">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
               <h3 className="text-xl font-bold text-gray-900">Apply for {job.role}</h3>
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
@@ -277,7 +319,6 @@ export default function JobDetailsPage() {
               <div>
                 <h4 className="font-semibold text-gray-900 mb-3">Resume</h4>
                 <div className="space-y-3">
-                  {/* EXISTING RESUME OPTION (FIXED LAYOUT) */}
                   {profile?.resume && (
                     <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors w-full">
                       <input 
@@ -296,7 +337,6 @@ export default function JobDetailsPage() {
                     </label>
                   )}
                   
-                  {/* NEW RESUME OPTION */}
                   <label className="flex items-start p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
                     <input 
                       type="radio" 
@@ -369,6 +409,75 @@ export default function JobDetailsPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                 />
               </div>
+
+              {/* 4. Screening Questions */}
+              {hasQuestions && (
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-3">Screening Questions</h4>
+                  <div className="space-y-4">
+                    {job.question_one && (
+                      <div>
+                        <label className="block text-sm text-gray-700 mb-1">{job.question_one}</label>
+                        <textarea
+                          rows={2}
+                          value={answerOne}
+                          onChange={(e) => setAnswerOne(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                          placeholder="Your answer..."
+                        />
+                      </div>
+                    )}
+                    {job.question_two && (
+                      <div>
+                        <label className="block text-sm text-gray-700 mb-1">{job.question_two}</label>
+                        <textarea
+                          rows={2}
+                          value={answerTwo}
+                          onChange={(e) => setAnswerTwo(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                          placeholder="Your answer..."
+                        />
+                      </div>
+                    )}
+                    {job.question_three && (
+                      <div>
+                        <label className="block text-sm text-gray-700 mb-1">{job.question_three}</label>
+                        <textarea
+                          rows={2}
+                          value={answerThree}
+                          onChange={(e) => setAnswerThree(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                          placeholder="Your answer..."
+                        />
+                      </div>
+                    )}
+                    {job.question_four && (
+                      <div>
+                        <label className="block text-sm text-gray-700 mb-1">{job.question_four}</label>
+                        <textarea
+                          rows={2}
+                          value={answerFour}
+                          onChange={(e) => setAnswerFour(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                          placeholder="Your answer..."
+                        />
+                      </div>
+                    )}
+                    {job.question_five && (
+                      <div>
+                        <label className="block text-sm text-gray-700 mb-1">{job.question_five}</label>
+                        <textarea
+                          rows={2}
+                          value={answerFive}
+                          onChange={(e) => setAnswerFive(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                          placeholder="Your answer..."
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {error && <p className="text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100">{error}</p>}
 

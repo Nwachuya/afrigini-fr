@@ -67,6 +67,11 @@ export interface JobRecord extends BaseRecord {
   paymentType?: 'Monthly' | 'Hourly' | 'Annually';
   scope?: 'Listing Only' | 'Full Recruitment';
   wp_post_id?: number;
+  question_one: string;
+  question_two: string;
+  question_three: string;
+  question_four: string;
+  question_five: string;
   // Expanded fields helper
   expand?: {
     organization?: OrganizationRecord;
@@ -82,6 +87,11 @@ export interface JobApplicationRecord extends BaseRecord {
   resume_file?: string;
   cover_letter_file?: string;
   earliest_start_date?: string;
+  answer_one: string;
+  answer_two: string;
+  answer_three: string;
+  answer_four: string;
+  answer_five: string; 
   expand?: {
     job?: JobRecord;
     applicant?: CandidateProfileRecord;
