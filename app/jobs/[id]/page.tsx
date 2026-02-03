@@ -24,7 +24,7 @@ export default function JobDetailsPage() {
   const [error, setError] = useState('');
   
   // Form Fields
-  const [resumeChoice, setResumeChoice] = useState<'existing' | 'new'>('existing');
+  const [resumeChoice, setResumeChoice] = useState<'existing' | 'new' | 'generated'>('existing');
   const [coverLetterType, setCoverLetterType] = useState<'text' | 'file'>('text');
   const [coverLetterText, setCoverLetterText] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -96,7 +96,11 @@ export default function JobDetailsPage() {
     
     // Reset form and open
     setError('');
-    setResumeChoice(profile.resume ? 'existing' : 'new'); 
+    if (profile.resume_generated_pdf) {
+      setResumeChoice('generated');
+    } else {
+      setResumeChoice(profile.resume ? 'existing' : 'new');
+    }
     setStartDate('');
     setCoverLetterText('');
     setAnswerOne('');
@@ -132,6 +136,17 @@ export default function JobDetailsPage() {
         } else {
           throw new Error("Please select a resume file to upload.");
         }
+      } else if (resumeChoice === 'generated') {
+        if (!profile.resume_generated_pdf) {
+          throw new Error("Generated resume PDF is not available yet.");
+        }
+        const pdfUrl = `${process.env.NEXT_PUBLIC_POCKETBASE_URL}/api/files/candidate_profiles/${profile.id}/${profile.resume_generated_pdf}`;
+        const pdfResponse = await fetch(pdfUrl);
+        if (!pdfResponse.ok) {
+          throw new Error("Failed to fetch generated resume PDF.");
+        }
+        const pdfBlob = await pdfResponse.blob();
+        formData.append('resume_file', new File([pdfBlob], 'generated-resume.pdf', { type: 'application/pdf' }));
       } 
 
       // Handle Cover Letter
@@ -295,7 +310,7 @@ export default function JobDetailsPage() {
             ) : (
               <button 
                 onClick={openApplicationModal}
-                className="w-full py-3.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-all shadow-md hover:shadow-lg"
+                className="w-full py-3.5 bg-brand-green text-white font-bold rounded-lg hover:bg-brand-green/90 transition-all shadow-md hover:shadow-lg"
               >
                 Apply Now
               </button>
@@ -319,6 +334,41 @@ export default function JobDetailsPage() {
               <div>
                 <h4 className="font-semibold text-gray-900 mb-3">Resume</h4>
                 <div className="space-y-3">
+                  <label className={`flex items-start p-3 border rounded-lg transition-colors w-full ${
+                    profile?.resume_generated_pdf ? 'cursor-pointer hover:bg-gray-50' : 'opacity-60 cursor-not-allowed'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="resume"
+                      checked={resumeChoice === 'generated'}
+                      onChange={() => profile?.resume_generated_pdf && setResumeChoice('generated')}
+                      disabled={!profile?.resume_generated_pdf}
+                      className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 mt-1 flex-shrink-0"
+                    />
+                    <div className="ml-3 w-full">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-semibold text-gray-800">Use generated resume</span>
+                        <span className="text-[10px] font-semibold uppercase tracking-wide bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-100">
+                          Recommended
+                        </span>
+                        {profile?.resume_generated_pdf && (
+                          <a
+                            href={`${process.env.NEXT_PUBLIC_POCKETBASE_URL}/api/files/candidate_profiles/${profile.id}/${profile.resume_generated_pdf}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline text-xs"
+                          >
+                            View generated PDF
+                          </a>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {profile?.resume_generated_pdf
+                          ? 'Auto-generated from your profile.'
+                          : 'Not available yet — complete your profile to generate it.'}
+                      </p>
+                    </div>
+                  </label>
                   {profile?.resume && (
                     <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors w-full">
                       <input 
@@ -493,7 +543,7 @@ export default function JobDetailsPage() {
                 <button 
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-70 transition-colors"
+                  className="flex-1 py-2.5 bg-brand-green text-white font-medium rounded-lg hover:bg-brand-green/90 disabled:opacity-70 transition-colors"
                 >
                   {submitting ? 'Submitting...' : 'Submit Application'}
                 </button>

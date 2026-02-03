@@ -31,6 +31,9 @@ export interface CandidateProfileRecord extends BaseRecord {
   headline?: string;
   bio?: string;
   resume?: string;
+  resume_generated?: string;
+  resume_generated_redacted?: string;
+  resume_generated_pdf?: string;
   skills?: string[] | string; // Can be JSON array or string depending on parsing
   is_open_to_work: boolean;
   location?: any; // JSON or string
@@ -41,6 +44,10 @@ export interface CandidateProfileRecord extends BaseRecord {
   linkedin?: string;
   portfolio?: string;
   gender?: 'Male' | 'Female' | 'Non Binary';
+  work_experience?: any;
+  languages?: any;
+  education?: any;
+  certifications?: any;
 }
 
 export interface OrganizationRecord extends BaseRecord {
