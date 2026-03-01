@@ -2,10 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import pb from '@/lib/pocketbase';
 import { UserRecord, CandidateProfileRecord, JobRecord } from '@/types';
 
 export default function FindCandidatesPage() {
+  const router = useRouter();
+
   // Data State
   const [candidates, setCandidates] = useState<CandidateProfileRecord[]>([]);
   const [myJobs, setMyJobs] = useState<JobRecord[]>([]);
@@ -19,6 +22,8 @@ export default function FindCandidatesPage() {
   
   // User/Org State
   const [orgId, setOrgId] = useState<string | null>(null);
+  const [canInvite, setCanInvite] = useState(false);
+  const [accessError, setAccessError] = useState<string | null>(null);
 
   // Modal State
   const [selectedCandidate, setSelectedCandidate] = useState<CandidateProfileRecord | null>(null);
@@ -38,37 +43,55 @@ export default function FindCandidatesPage() {
     const init = async () => {
       try {
         const user = pb.authStore.model as unknown as UserRecord;
-        
-        if (user) {
-          try {
-            const memberRes = await pb.collection('org_members').getFirstListItem(
-              `user = "${user.id}"`,
-              { requestKey: null }
-            );
-            if (memberRes) {
-              setOrgId(memberRes.organization);
-              
-              // Fetch ALL Open Jobs for the Org
-              const jobsRes = await pb.collection('jobs').getFullList({
-                filter: `organization = "${memberRes.organization}" && stage = "Open"`,
-                sort: '-created',
-                requestKey: null
-              });
-              setMyJobs(jobsRes as unknown as JobRecord[]);
-            }
-          } catch (e) {
-            console.log("Not part of an org");
-          }
+        if (!user) {
+          router.replace('/login');
+          return;
+        }
+
+        if (user.role === 'Applicant') {
+          router.replace('/dashboard/applicant');
+          return;
+        }
+
+        const memberRes = await pb.collection('org_members').getFirstListItem(
+          `user = "${user.id}"`,
+          { requestKey: null }
+        );
+
+        if (!memberRes?.organization) {
+          setAccessError('You need an organization membership to access the candidate directory.');
+          setLoading(false);
+          return;
+        }
+
+        setOrgId(memberRes.organization);
+
+        const memberCanInvite = memberRes.role === 'owner' || memberRes.role === 'recruiter';
+        setCanInvite(memberCanInvite);
+
+        if (memberCanInvite) {
+          const jobsRes = await pb.collection('jobs').getFullList({
+            filter: `organization = "${memberRes.organization}" && stage = "Open"`,
+            sort: '-created',
+            requestKey: null
+          });
+          setMyJobs(jobsRes as unknown as JobRecord[]);
         }
       } catch (err) {
         console.error("Error loading init data:", err);
+        setAccessError('Unable to load candidate directory access for your account.');
+        setLoading(false);
       }
     };
     init();
-  }, []);
+  }, [router]);
 
   // Fetch Candidates
   useEffect(() => {
+    if (!orgId || accessError) {
+      return;
+    }
+
     const fetchCandidates = async () => {
       setLoading(true);
       try {
@@ -102,7 +125,7 @@ export default function FindCandidatesPage() {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [page, searchTerm, locationFilter]);
+  }, [accessError, locationFilter, orgId, page, searchTerm]);
 
   // When opening modal, calculate eligible jobs
   useEffect(() => {
@@ -152,7 +175,7 @@ export default function FindCandidatesPage() {
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!orgId || !selectedJobId || !selectedCandidate) return;
+    if (!orgId || !selectedJobId || !selectedCandidate || !canInvite) return;
 
     setSendingInvite(true);
     setInviteError(null);
@@ -184,6 +207,17 @@ export default function FindCandidatesPage() {
 
   const totalPages = Math.ceil(totalItems / PER_PAGE);
 
+  if (accessError) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-yellow-900">
+          <h1 className="text-2xl font-bold mb-2">Candidate Directory</h1>
+          <p>{accessError}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative">
       
@@ -192,6 +226,12 @@ export default function FindCandidatesPage() {
         <h1 className="text-3xl font-bold text-brand-dark">Candidate Directory</h1>
         <p className="text-gray-500 mt-1">Discover talent open to new opportunities.</p>
       </div>
+
+      {!canInvite && (
+        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-900">
+          Your current organization role can browse candidates, but only owners and recruiters can send invitations.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         
@@ -289,18 +329,19 @@ export default function FindCandidatesPage() {
                     <div className="mt-auto pt-4 border-t border-gray-100">
                       <button 
                         onClick={() => {
-                          if (!orgId) {
-                            alert("You must represent an organization to invite candidates.");
+                          if (!canInvite) {
+                            alert("Only owners and recruiters can invite candidates.");
                             return;
                           }
                           setSelectedCandidate(candidate);
                         }}
-                        className="w-full py-2.5 bg-white border border-brand-green text-brand-green font-bold rounded-lg hover:bg-green-50 transition-colors flex items-center justify-center gap-2"
+                        disabled={!canInvite}
+                        className="w-full py-2.5 bg-white border border-brand-green text-brand-green font-bold rounded-lg hover:bg-green-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
                       >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
-                        Invite to Apply
+                        {canInvite ? 'Invite to Apply' : 'Invite Unavailable'}
                       </button>
                     </div>
                   </div>

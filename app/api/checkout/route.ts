@@ -1,22 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import PocketBase from 'pocketbase';
+import { APP_SESSION_COOKIE, PB_TOKEN_COOKIE, verifySessionToken } from '@/lib/session';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2026-01-28.clover',
 });
 
-const pb = new PocketBase('https://pb.afrigini.com');
+const PB_URL = process.env.NEXT_PUBLIC_POCKETBASE_URL || 'https://pb.afrigini.com';
 
 export async function POST(request: NextRequest) {
   try {
+    const sessionCookie = request.cookies.get(APP_SESSION_COOKIE)?.value;
+    const pbToken = request.cookies.get(PB_TOKEN_COOKIE)?.value;
+    const authenticatedSession = sessionCookie ? await verifySessionToken(sessionCookie) : null;
+
+    if (!authenticatedSession || !pbToken) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const pb = new PocketBase(PB_URL);
+    pb.authStore.save(pbToken, null);
+
     const body = await request.json();
-    const { orgId, priceId, userEmail, orgName } = body;
+    const { orgId, priceId } = body;
 
     if (!orgId || !priceId) {
       return NextResponse.json(
         { error: 'Missing orgId or priceId' },
         { status: 400 }
+      );
+    }
+
+    try {
+      await pb.collection('org_members').getFirstListItem(
+        `user = "${authenticatedSession.userId}" && organization = "${orgId}"`,
+        { requestKey: null }
+      );
+    } catch {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403 }
       );
     }
 
@@ -34,8 +61,8 @@ export async function POST(request: NextRequest) {
 
     if (!customerId) {
       const customer = await stripe.customers.create({
-        email: userEmail || undefined,
-        name: orgName || org.name || undefined,
+        email: authenticatedSession.email || undefined,
+        name: org.name || undefined,
         metadata: {
           orgId: orgId,
         },
@@ -48,7 +75,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const session = await stripe.checkout.sessions.create({
+    const checkoutSession = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'payment',
       line_items: [
@@ -65,7 +92,7 @@ export async function POST(request: NextRequest) {
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing?canceled=true`,
     });
 
-    return NextResponse.json({ url: session.url });
+    return NextResponse.json({ url: checkoutSession.url });
 
   } catch (err: any) {
     console.error('Checkout error:', err);

@@ -10,8 +10,8 @@ export default function UserDropdown({ user, userRole }: { user: UserRecord; use
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     router.push('/login');
     setIsOpen(false);
   };

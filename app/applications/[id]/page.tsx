@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import pb from '@/lib/pocketbase';
+import { htmlToPlainText } from '@/lib/sanitize-html';
 import { UserRecord } from '@/types';
 
 // --- Interfaces ---
@@ -169,6 +170,9 @@ export default function ApplicationReviewPage() {
   const resumeUrl = app.resume_file 
     ? `${process.env.NEXT_PUBLIC_POCKETBASE_URL}/api/files/job_applications/${app.id}/${app.resume_file}`
     : null;
+  const coverLetterText = htmlToPlainText(app.cover_letter);
+  const jobDescriptionText = htmlToPlainText(app.expand?.job?.description);
+  const jobBenefitsText = htmlToPlainText(app.expand?.job?.benefits);
 
   const videoFileUrl = video?.video_file 
     ? `${process.env.NEXT_PUBLIC_POCKETBASE_URL}/api/files/video_submissions/${video.id}/${video.video_file}`
@@ -323,10 +327,13 @@ export default function ApplicationReviewPage() {
           {/* 4. Cover Letter */}
           <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
             <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-4">Cover Letter</h3>
-            <div 
-              className="prose max-w-none text-gray-600 text-sm leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: app.cover_letter || '<p class="italic text-gray-400">No cover letter provided.</p>' }}
-            />
+            {coverLetterText ? (
+              <div className="whitespace-pre-wrap text-gray-600 text-sm leading-relaxed">
+                {coverLetterText}
+              </div>
+            ) : (
+              <p className="italic text-gray-400">No cover letter provided.</p>
+            )}
           </div>
 
         </div>
@@ -422,19 +429,21 @@ export default function ApplicationReviewPage() {
 
                 <div>
                   <h4 className="text-gray-500 font-bold text-xs uppercase mb-2">Description</h4>
-                  <div 
-                    className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
-                    dangerouslySetInnerHTML={{ __html: app.expand.job.description }}
-                  />
+                  {jobDescriptionText ? (
+                    <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
+                      {jobDescriptionText}
+                    </div>
+                  ) : (
+                    <p className="text-gray-400">No description provided.</p>
+                  )}
                 </div>
 
-                {app.expand.job.benefits && (
+                {jobBenefitsText && (
                   <div>
                     <h4 className="text-gray-500 font-bold text-xs uppercase mb-2">Benefits</h4>
-                    <div 
-                      className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
-                      dangerouslySetInnerHTML={{ __html: app.expand.job.benefits }}
-                    />
+                    <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
+                      {jobBenefitsText}
+                    </div>
                   </div>
                 )}
               </div>

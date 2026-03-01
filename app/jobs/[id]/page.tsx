@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import pb from '@/lib/pocketbase';
+import { htmlToPlainText } from '@/lib/sanitize-html';
 import { JobRecord, UserRecord, CandidateProfileRecord } from '@/types';
 
 export default function JobDetailsPage() {
@@ -201,6 +202,8 @@ export default function JobDetailsPage() {
   const logoUrl = org?.logo 
     ? `${process.env.NEXT_PUBLIC_POCKETBASE_URL}/api/files/organizations/${org.id}/${org.logo}`
     : null;
+  const descriptionText = htmlToPlainText(job.description);
+  const benefitsText = htmlToPlainText(job.benefits);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -263,22 +266,20 @@ export default function JobDetailsPage() {
 
           {/* Description */}
           <div className="bg-white border border-gray-200 rounded-xl p-8 shadow-sm space-y-8">
-            {job.description && (
+            {descriptionText && (
               <section>
                 <h2 className="text-xl font-bold text-gray-900 mb-4 border-b border-gray-100 pb-2">About the Role</h2>
-                <div 
-                  className="prose prose-gray max-w-none prose-headings:font-semibold prose-headings:text-gray-900 prose-p:text-gray-600 prose-p:leading-relaxed prose-ul:text-gray-600 prose-ol:text-gray-600 prose-li:marker:text-gray-400 prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline prose-strong:text-gray-900"
-                  dangerouslySetInnerHTML={{ __html: job.description }} 
-                />
+                <div className="whitespace-pre-wrap text-gray-600 leading-relaxed">
+                  {descriptionText}
+                </div>
               </section>
             )}
-            {job.benefits && (
+            {benefitsText && (
               <section>
                 <h2 className="text-xl font-bold text-gray-900 mb-4 border-b border-gray-100 pb-2">Benefits & Perks</h2>
-                <div 
-                  className="prose prose-gray max-w-none prose-headings:font-semibold prose-headings:text-gray-900 prose-p:text-gray-600 prose-p:leading-relaxed prose-ul:text-gray-600 prose-ol:text-gray-600 prose-li:marker:text-gray-400 prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline prose-strong:text-gray-900"
-                  dangerouslySetInnerHTML={{ __html: job.benefits }} 
-                />
+                <div className="whitespace-pre-wrap text-gray-600 leading-relaxed">
+                  {benefitsText}
+                </div>
               </section>
             )}
           </div>

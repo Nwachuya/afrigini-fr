@@ -64,8 +64,8 @@ export default function Sidebar({ user, userRole, isOpen, onToggle }: SidebarPro
     return false;
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     router.push('/login');
   };
 

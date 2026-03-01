@@ -1,56 +1,159 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import type { UserRole } from '@/types';
+import {
+  APP_SESSION_COOKIE,
+  PB_TOKEN_COOKIE,
+  SESSION_COOKIE_OPTIONS,
+  createSessionToken,
+  isSessionConfigured,
+  verifySessionToken,
+} from '@/lib/session';
 
 const PUBLIC_PATHS = ['/', '/login', '/register', '/forgot-password'];
+const PB_URL = process.env.NEXT_PUBLIC_POCKETBASE_URL || 'http://127.0.0.1:8090';
+const VALID_ROLES: UserRole[] = ['Applicant', 'Company', 'recruiter', 'billing', 'owner'];
 
-export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  
-  // Get the pb_auth cookie
-  const authCookie = request.cookies.get('pb_auth')?.value;
-  
-  let isAuthenticated = false;
-  let userRole: string | null = null;
-  
-  if (authCookie) {
-    try {
-      let cookieValue = authCookie;
-      
-      if (cookieValue.startsWith('%7B')) {
-        cookieValue = decodeURIComponent(cookieValue);
-      }
-      
-      const parsed = JSON.parse(cookieValue);
-      
-      if (parsed.token && parsed.model) {
-        isAuthenticated = true;
-        userRole = parsed.model.role || null;
-      }
-    } catch (e) {
-      isAuthenticated = false;
+type RefreshedUser = {
+  id: string;
+  role: UserRole;
+  email?: string;
+};
+
+type AuthRefreshResult = {
+  token: string;
+  record: RefreshedUser;
+};
+
+function clearAuthCookies(response: NextResponse) {
+  response.cookies.set(APP_SESSION_COOKIE, '', {
+    ...SESSION_COOKIE_OPTIONS,
+    maxAge: 0,
+  });
+  response.cookies.set(PB_TOKEN_COOKIE, '', {
+    ...SESSION_COOKIE_OPTIONS,
+    maxAge: 0,
+  });
+}
+
+function redirectToLogin(request: NextRequest, pathname: string) {
+  const loginUrl = new URL('/login', request.url);
+  loginUrl.searchParams.set('redirect', pathname);
+  return NextResponse.redirect(loginUrl);
+}
+
+async function refreshPocketBaseSession(token: string): Promise<AuthRefreshResult | null> {
+  try {
+    const response = await fetch(`${PB_URL}/api/collections/users/auth-refresh`, {
+      method: 'POST',
+      headers: {
+        Authorization: token,
+      },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      return null;
     }
+
+    const data = await response.json();
+
+    if (
+      typeof data?.token !== 'string' ||
+      typeof data?.record?.id !== 'string' ||
+      typeof data?.record?.role !== 'string' ||
+      (data?.record?.email !== undefined && typeof data.record.email !== 'string')
+    ) {
+      return null;
+    }
+
+    if (!VALID_ROLES.includes(data.record.role as UserRole)) {
+      return null;
+    }
+
+    return {
+      token: data.token,
+      record: {
+        id: data.record.id,
+        role: data.record.role as UserRole,
+        email: data.record.email,
+      },
+    };
+  } catch {
+    return null;
   }
-  
+}
+
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const sessionCookie = request.cookies.get(APP_SESSION_COOKIE)?.value;
   const isPublicPath = PUBLIC_PATHS.includes(pathname);
-  
-  // Authenticated user on public page → redirect to dashboard
-  if (isAuthenticated && isPublicPath) {
-    const dashboardPath = userRole === 'Applicant' 
-      ? '/dashboard/applicant' 
-      : '/dashboard/organization';
-    
-    return NextResponse.redirect(new URL(dashboardPath, request.url));
+  const pbToken = request.cookies.get(PB_TOKEN_COOKIE)?.value;
+
+  if (!isSessionConfigured()) {
+    if (isPublicPath) {
+      return NextResponse.next();
+    }
+
+    const response = redirectToLogin(request, pathname);
+    clearAuthCookies(response);
+    return response;
   }
-  
-  // Unauthenticated user on protected page → redirect to login
-  if (!isAuthenticated && !isPublicPath) {
-    const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('redirect', pathname);
-    
-    return NextResponse.redirect(loginUrl);
+
+  if (!sessionCookie) {
+    if (isPublicPath) {
+      return NextResponse.next();
+    }
+
+    return redirectToLogin(request, pathname);
   }
-  
-  return NextResponse.next();
+
+  const session = await verifySessionToken(sessionCookie);
+  if (!session || !pbToken) {
+    if (isPublicPath) {
+      const response = NextResponse.next();
+      clearAuthCookies(response);
+      return response;
+    }
+
+    const response = redirectToLogin(request, pathname);
+    clearAuthCookies(response);
+    return response;
+  }
+
+  const refreshed = await refreshPocketBaseSession(pbToken);
+  if (!refreshed || refreshed.record.id !== session.userId) {
+    if (isPublicPath) {
+      const response = NextResponse.next();
+      clearAuthCookies(response);
+      return response;
+    }
+
+    const response = redirectToLogin(request, pathname);
+    clearAuthCookies(response);
+    return response;
+  }
+
+  const nextSessionToken = await createSessionToken({
+    userId: refreshed.record.id,
+    role: refreshed.record.role,
+    email: refreshed.record.email,
+  });
+  const dashboardPath = refreshed.record.role === 'Applicant'
+    ? '/dashboard/applicant'
+    : '/dashboard/organization';
+
+  if (isPublicPath) {
+    const response = NextResponse.redirect(new URL(dashboardPath, request.url));
+    response.cookies.set(APP_SESSION_COOKIE, nextSessionToken, SESSION_COOKIE_OPTIONS);
+    response.cookies.set(PB_TOKEN_COOKIE, refreshed.token, SESSION_COOKIE_OPTIONS);
+    return response;
+  }
+
+  const response = NextResponse.next();
+  response.cookies.set(APP_SESSION_COOKIE, nextSessionToken, SESSION_COOKIE_OPTIONS);
+  response.cookies.set(PB_TOKEN_COOKIE, refreshed.token, SESSION_COOKIE_OPTIONS);
+  return response;
 }
 
 export const config = {

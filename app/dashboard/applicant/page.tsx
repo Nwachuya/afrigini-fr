@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import pb from '@/lib/pocketbase';
 import { UserRecord, CandidateProfileRecord, JobRecord } from '@/types';
 import Link from 'next/link';
+import { getApplicantProfileBanner } from '@/lib/candidate-profile';
 
 export default function ApplicantDashboard() {
   const router = useRouter();
@@ -106,7 +107,7 @@ export default function ApplicantDashboard() {
     ? `${process.env.NEXT_PUBLIC_POCKETBASE_URL}/api/files/users/${user.id}/${user.avatar}` 
     : null;
     
-  const isProfileIncomplete = !profile || !profile.headline || !profile.resume;
+  const profileBanner = getApplicantProfileBanner(profile);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -127,7 +128,7 @@ export default function ApplicantDashboard() {
       </div>
 
       {/* Profile Callout */}
-      {isProfileIncomplete && (
+      {profileBanner.show && (
         <div className="bg-yellow-50 border-l-4 border-yellow-400 p-6 rounded-r-lg flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="text-yellow-500">
@@ -136,8 +137,8 @@ export default function ApplicantDashboard() {
               </svg>
             </div>
             <div>
-              <h3 className="font-bold text-yellow-800">Complete Your Profile</h3>
-              <p className="text-sm text-yellow-700">Add your resume and a headline to increase your chances of getting noticed.</p>
+              <h3 className="font-bold text-yellow-800">{profileBanner.title}</h3>
+              <p className="text-sm text-yellow-700">{profileBanner.message}</p>
             </div>
           </div>
           <Link 

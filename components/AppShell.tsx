@@ -118,8 +118,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     setMobileMenuOpen(false);
     router.push('/login');
   };

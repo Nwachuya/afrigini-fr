@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import pb from '@/lib/pocketbase';
+import { htmlToPlainText } from '@/lib/sanitize-html';
 import { UserRecord, JobApplicationRecord } from '@/types';
 
 // Local Interface Definitions
@@ -322,6 +323,9 @@ export default function ApplicationDetailPage() {
   const status = getStatusInfo(application.stage);
   const showVideoUpload = application.stage === 'Send Video' && !videoSubmission;
   const hasSubmittedVideo = !!videoSubmission;
+  const descriptionText = htmlToPlainText(job?.description);
+  const benefitsText = htmlToPlainText(job?.benefits);
+  const coverLetterText = htmlToPlainText(application.cover_letter);
 
   const logoUrl = org?.logo ? `${process.env.NEXT_PUBLIC_POCKETBASE_URL}/api/files/organizations/${org.id}/${org.logo}` : null;
   const videoFileUrl = videoSubmission?.video_file ? `${process.env.NEXT_PUBLIC_POCKETBASE_URL}/api/files/video_submissions/${videoSubmission.id}/${videoSubmission.video_file}` : null;
@@ -501,14 +505,14 @@ export default function ApplicationDetailPage() {
           {/* Job Description */}
           <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4">Job Description</h2>
-            {job?.description ? <div className="prose prose-gray max-w-none text-gray-600" dangerouslySetInnerHTML={{ __html: job.description }} /> : <p className="text-gray-500">No description provided.</p>}
+            {descriptionText ? <div className="whitespace-pre-wrap text-gray-600 leading-relaxed">{descriptionText}</div> : <p className="text-gray-500">No description provided.</p>}
           </div>
 
           {/* Benefits */}
-          {job?.benefits && (
+          {benefitsText && (
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
               <h2 className="text-lg font-bold text-gray-900 mb-4">Benefits</h2>
-              <div className="prose prose-gray max-w-none text-gray-600" dangerouslySetInnerHTML={{ __html: job.benefits }} />
+              <div className="whitespace-pre-wrap text-gray-600 leading-relaxed">{benefitsText}</div>
             </div>
           )}
 
@@ -516,10 +520,10 @@ export default function ApplicationDetailPage() {
           <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4">Your Application</h2>
             <div className="space-y-4">
-              {application.cover_letter && (
+              {coverLetterText && (
                 <div>
                   <h3 className="text-sm font-medium text-gray-700 mb-2">Cover Letter</h3>
-                  <div className="prose prose-sm prose-gray max-w-none text-gray-600 bg-gray-50 rounded-lg p-4" dangerouslySetInnerHTML={{ __html: application.cover_letter }} />
+                  <div className="whitespace-pre-wrap text-gray-600 bg-gray-50 rounded-lg p-4 leading-relaxed">{coverLetterText}</div>
                 </div>
               )}
               {application.resume_file && (
