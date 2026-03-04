@@ -19,10 +19,6 @@ function clearCookie(response: NextResponse, name: string) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!isSessionConfigured()) {
-    return NextResponse.json({ error: 'SESSION_SECRET is not configured' }, { status: 500 });
-  }
-
   try {
     const body = await request.json();
     const token = typeof body?.token === 'string' ? body.token : '';
@@ -36,14 +32,22 @@ export async function POST(request: NextRequest) {
 
     const authData = await pb.collection('users').authRefresh({ requestKey: null });
     const user = authData.record as unknown as UserRecord;
-    const sessionToken = await createSessionToken({
-      userId: user.id,
-      role: user.role,
-      email: user.email,
+    const response = NextResponse.json({
+      ok: true,
+      sessionConfigured: isSessionConfigured(),
     });
 
-    const response = NextResponse.json({ ok: true });
-    response.cookies.set(APP_SESSION_COOKIE, sessionToken, SESSION_COOKIE_OPTIONS);
+    if (isSessionConfigured()) {
+      const sessionToken = await createSessionToken({
+        userId: user.id,
+        role: user.role,
+        email: user.email,
+      });
+      response.cookies.set(APP_SESSION_COOKIE, sessionToken, SESSION_COOKIE_OPTIONS);
+    } else {
+      clearCookie(response, APP_SESSION_COOKIE);
+    }
+
     response.cookies.set(PB_TOKEN_COOKIE, authData.token, SESSION_COOKIE_OPTIONS);
     return response;
   } catch (error) {

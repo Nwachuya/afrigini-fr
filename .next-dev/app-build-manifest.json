@@ -75,6 +75,11 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(private)/org/manage-jobs/[id]/page.js"
+    ],
+    "/(private)/org/manage-jobs/[id]/view/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(private)/org/manage-jobs/[id]/view/page.js"
     ]
   }
 }

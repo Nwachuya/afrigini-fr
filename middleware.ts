@@ -12,7 +12,6 @@ import {
   SESSION_COOKIE_OPTIONS,
   createSessionToken,
   isSessionConfigured,
-  verifySessionToken,
 } from '@/lib/session';
 
 const PUBLIC_PATHS = ['/', '/login', '/register', '/forgot-password'];
@@ -91,32 +90,13 @@ async function refreshPocketBaseSession(token: string): Promise<AuthRefreshResul
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const sessionCookie = request.cookies.get(APP_SESSION_COOKIE)?.value;
   const isPublicPath = PUBLIC_PATHS.includes(pathname);
   const isCandidatePath = pathname.startsWith('/candidates');
   const isOrgPath = pathname.startsWith('/org');
   const pbToken = request.cookies.get(PB_TOKEN_COOKIE)?.value;
+  const sessionConfigured = isSessionConfigured();
 
-  if (!isSessionConfigured()) {
-    if (isPublicPath) {
-      return NextResponse.next();
-    }
-
-    const response = redirectToLogin(request, pathname);
-    clearAuthCookies(response);
-    return response;
-  }
-
-  if (!sessionCookie) {
-    if (isPublicPath) {
-      return NextResponse.next();
-    }
-
-    return redirectToLogin(request, pathname);
-  }
-
-  const session = await verifySessionToken(sessionCookie);
-  if (!session || !pbToken) {
+  if (!pbToken) {
     if (isPublicPath) {
       const response = NextResponse.next();
       clearAuthCookies(response);
@@ -129,7 +109,7 @@ export async function middleware(request: NextRequest) {
   }
 
   const refreshed = await refreshPocketBaseSession(pbToken);
-  if (!refreshed || refreshed.record.id !== session.userId) {
+  if (!refreshed) {
     if (isPublicPath) {
       const response = NextResponse.next();
       clearAuthCookies(response);
@@ -141,38 +121,45 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  const nextSessionToken = await createSessionToken({
-    userId: refreshed.record.id,
-    role: refreshed.record.role,
-    email: refreshed.record.email,
-  });
   const dashboardPath = getDefaultDashboardPath(refreshed.record.role);
+
+  const applyAuthCookies = async (response: NextResponse) => {
+    response.cookies.set(PB_TOKEN_COOKIE, refreshed.token, SESSION_COOKIE_OPTIONS);
+
+    if (sessionConfigured) {
+      const nextSessionToken = await createSessionToken({
+        userId: refreshed.record.id,
+        role: refreshed.record.role,
+        email: refreshed.record.email,
+      });
+      response.cookies.set(APP_SESSION_COOKIE, nextSessionToken, SESSION_COOKIE_OPTIONS);
+    } else {
+      response.cookies.set(APP_SESSION_COOKIE, '', {
+        ...SESSION_COOKIE_OPTIONS,
+        maxAge: 0,
+      });
+    }
+
+    return response;
+  };
 
   if (isPublicPath) {
     const response = NextResponse.redirect(new URL(dashboardPath, request.url));
-    response.cookies.set(APP_SESSION_COOKIE, nextSessionToken, SESSION_COOKIE_OPTIONS);
-    response.cookies.set(PB_TOKEN_COOKIE, refreshed.token, SESSION_COOKIE_OPTIONS);
-    return response;
+    return applyAuthCookies(response);
   }
 
   if (isCandidatePath && !canAccessCandidateNamespace(refreshed.record.role)) {
     const response = NextResponse.redirect(new URL(dashboardPath, request.url));
-    response.cookies.set(APP_SESSION_COOKIE, nextSessionToken, SESSION_COOKIE_OPTIONS);
-    response.cookies.set(PB_TOKEN_COOKIE, refreshed.token, SESSION_COOKIE_OPTIONS);
-    return response;
+    return applyAuthCookies(response);
   }
 
   if (isOrgPath && !canAccessOrgNamespace(refreshed.record.role)) {
     const response = NextResponse.redirect(new URL(dashboardPath, request.url));
-    response.cookies.set(APP_SESSION_COOKIE, nextSessionToken, SESSION_COOKIE_OPTIONS);
-    response.cookies.set(PB_TOKEN_COOKIE, refreshed.token, SESSION_COOKIE_OPTIONS);
-    return response;
+    return applyAuthCookies(response);
   }
 
   const response = NextResponse.next();
-  response.cookies.set(APP_SESSION_COOKIE, nextSessionToken, SESSION_COOKIE_OPTIONS);
-  response.cookies.set(PB_TOKEN_COOKIE, refreshed.token, SESSION_COOKIE_OPTIONS);
-  return response;
+  return applyAuthCookies(response);
 }
 
 export const config = {
