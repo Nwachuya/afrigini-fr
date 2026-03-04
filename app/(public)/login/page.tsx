@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { login } from '@/lib/auth';
+import { isSessionSyncError, login } from '@/lib/auth';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,6 +14,10 @@ export default function LoginPage() {
 
   const getErrorMessage = (err: any): string => {
     const message = err?.message?.toLowerCase() || '';
+
+    if (isSessionSyncError(err)) {
+      return 'PocketBase accepted the login, but the app session could not be created. Check `SESSION_SECRET` and cookie settings on the deployed app.';
+    }
     
     if (message.includes('failed to authenticate') || message.includes('invalid credentials')) {
       return 'Invalid email or password. Please try again.';

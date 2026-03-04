@@ -2,57 +2,13 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useState, useEffect } from 'react';
-import pb from '@/lib/pocketbase';
-import { getCurrentUser, getUserRole } from '@/lib/auth';
-import { UserRecord, UserRole } from '@/types';
-import { getCurrentOrgMembership } from '@/lib/org-membership';
-import { getDefaultDashboardPath } from '@/lib/access';
-import { getNavItems } from '@/lib/navigation';
-import UserDropdown from './UserDropdown';
 
 export default function Navbar() {
-  const [user, setUser] = useState<UserRecord | null>(null);
-  const [userRole, setUserRole] = useState<UserRole | null>(null);
-  const [orgMembershipRole, setOrgMembershipRole] = useState<string | null>(null);
-  const dashboardHref = getDefaultDashboardPath(userRole, orgMembershipRole);
-  const navItems = getNavItems(userRole, orgMembershipRole).filter(
-    (item) => item.href !== dashboardHref && item.href !== '/candidates/account-settings'
-  );
-
-  useEffect(() => {
-    const updateState = async () => {
-      const currentUser = getCurrentUser();
-      const currentUserRole = getUserRole();
-
-      setUser(currentUser);
-      setUserRole(currentUserRole);
-
-      if (currentUser && currentUserRole !== 'Applicant') {
-        const membership = await getCurrentOrgMembership(currentUser.id);
-        setOrgMembershipRole(membership?.role ?? null);
-        return;
-      }
-
-      setOrgMembershipRole(null);
-    };
-
-    void updateState();
-
-    const unsubscribe = pb.authStore.onChange(() => {
-      void updateState();
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, []);
-
   return (
     <nav className="bg-white w-full border-b border-gray-200 sticky top-0 z-50">
       <div className="w-full px-6 lg:px-12 h-20 flex justify-between items-center">
         {/* Logo Section */}
-        <Link href={user ? dashboardHref : '/'} className="flex items-center gap-3 group">
+        <Link href="/" className="flex items-center gap-3 group">
           <div className="relative h-10 w-auto">
             <Image
               src="/afrigini_logo.png"
@@ -67,36 +23,18 @@ export default function Navbar() {
 
         {/* Navigation Links */}
         <div className="flex items-center gap-6">
-          {!user ? (
-            <>
-              <Link 
-                href="/login" 
-                className="text-sm font-bold text-gray-600 hover:text-brand-green transition-colors"
-              >
-                Login
-              </Link>
-              <Link 
-                href="/register" 
-                className="px-6 py-2.5 text-sm font-bold bg-brand-green text-white rounded-lg hover:bg-green-800 transition-colors shadow-sm"
-              >
-                Sign Up
-              </Link>
-            </>
-          ) : (
-            <>
-              <div className="hidden md:flex gap-6 text-sm font-medium text-gray-600">
-                {navItems.slice(0, 4).map((item) => (
-                  <Link key={item.href} href={item.href} className="hover:text-brand-green transition-colors">
-                    {item.label}
-                  </Link>
-                ))}
-              </div>
-
-              <div className="pl-2 border-l border-gray-200">
-                <UserDropdown user={user} userRole={userRole!} orgMembershipRole={orgMembershipRole} />
-              </div>
-            </>
-          )}
+          <Link 
+            href="/login" 
+            className="text-sm font-bold text-gray-600 hover:text-brand-green transition-colors"
+          >
+            Login
+          </Link>
+          <Link 
+            href="/register" 
+            className="px-6 py-2.5 text-sm font-bold bg-brand-green text-white rounded-lg hover:bg-green-800 transition-colors shadow-sm"
+          >
+            Sign Up
+          </Link>
         </div>
       </div>
     </nav>

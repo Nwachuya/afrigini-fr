@@ -1,9 +1,9 @@
 {
   "pages": {
-    "/(private)/candidates/jobs/page": [
+    "/(public)/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(private)/candidates/jobs/page.js"
+      "static/chunks/app/(public)/page.js"
     ],
     "/layout": [
       "static/chunks/webpack.js",
@@ -11,100 +11,40 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/(private)/candidates/my-profile/page": [
+    "/(private)/org/team/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(private)/candidates/my-profile/page.js"
-    ],
-    "/(private)/candidates/account-settings/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(private)/candidates/account-settings/page.js"
-    ],
-    "/(private)/candidates/my-applications/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(private)/candidates/my-applications/page.js"
-    ],
-    "/(private)/candidates/applicant/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(private)/candidates/applicant/page.js"
-    ],
-    "/(private)/candidates/jobs/[id]/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(private)/candidates/jobs/[id]/page.js"
-    ],
-    "/(private)/candidates/my-applications/[id]/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(private)/candidates/my-applications/[id]/page.js"
-    ],
-    "/(public)/login/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(public)/login/page.js"
-    ],
-    "/(private)/org/organization/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(private)/org/organization/page.js"
+      "static/chunks/app/(private)/org/team/page.js"
     ],
     "/(private)/org/manage-jobs/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(private)/org/manage-jobs/page.js"
     ],
-    "/(private)/org/team/page": [
+    "/(private)/org/organization/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(private)/org/team/page.js"
+      "static/chunks/app/(private)/org/organization/page.js"
     ],
-    "/(private)/org/billing/page": [
+    "/(public)/login/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(private)/org/billing/page.js"
-    ],
-    "/(private)/org/organization-settings/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(private)/org/organization-settings/page.js"
-    ],
-    "/(private)/org/manage-jobs/new/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(private)/org/manage-jobs/new/page.js"
-    ],
-    "/(private)/org/applications/[id]/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(private)/org/applications/[id]/page.js"
-    ],
-    "/(private)/org/manage-jobs/[id]/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(private)/org/manage-jobs/[id]/page.js"
-    ],
-    "/(private)/org/manage-jobs/[id]/view/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(private)/org/manage-jobs/[id]/view/page.js"
+      "static/chunks/app/(public)/login/page.js"
     ],
     "/(private)/org/applications/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(private)/org/applications/page.js"
     ],
+    "/(private)/org/applications/[id]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(private)/org/applications/[id]/page.js"
+    ],
     "/(private)/org/find-candidates/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(private)/org/find-candidates/page.js"
-    ],
-    "/(private)/org/find-candidates/[id]/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(private)/org/find-candidates/[id]/page.js"
     ]
   }
 }

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { register, login } from '@/lib/auth';
+import { isRegistrationCompletedError, isSessionSyncError, register } from '@/lib/auth';
 import { UserRole } from '@/types';
 
 export default function RegisterPage() {
@@ -15,6 +15,33 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<UserRole>('Applicant');
+
+  const getErrorMessage = (err: unknown): string => {
+    if (!(err instanceof Error)) {
+      return 'Registration failed.';
+    }
+
+    const message = err.message;
+    const lower = message.toLowerCase();
+
+    if (isRegistrationCompletedError(err)) {
+      return message.replace(/^REGISTRATION_COMPLETED:\s*/, '');
+    }
+
+    if (isSessionSyncError(err)) {
+      return 'Account authentication succeeded, but the app session could not be created. Check `SESSION_SECRET` on the deployed app and try logging in again.';
+    }
+
+    if (lower.includes('already exists') || lower.includes('not unique') || lower.includes('failed to create record')) {
+      return 'An account with this email already exists. Try signing in instead.';
+    }
+
+    if (lower.includes('network') || lower.includes('fetch')) {
+      return 'Unable to connect to the auth server. Check `NEXT_PUBLIC_POCKETBASE_URL`.';
+    }
+
+    return message || 'Registration failed.';
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,16 +55,15 @@ export default function RegisterPage() {
     }
 
     try {
-      await register(email, password, confirmPassword, role);
-      const user = await login(email, password);
+      const user = await register(email, password, confirmPassword, role);
       
       if (user.role === 'Applicant') {
         router.push('/candidates/applicant');
       } else {
         router.push('/org/organization');
       }
-    } catch (err: any) {
-      setError(err.message || "Registration failed.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }

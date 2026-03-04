@@ -2,9 +2,8 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { UserRecord, UserRole } from '@/types';
-import { logout } from '@/lib/auth';
 import { NavIconKey, getNavItems } from '@/lib/navigation';
 import {
   LayoutDashboard,
@@ -27,22 +26,17 @@ interface SidebarProps {
   orgMembershipRole?: string | null;
   isOpen: boolean;
   onToggle: () => void;
+  onLogout: () => void | Promise<void>;
 }
 
-export default function Sidebar({ user, userRole, orgMembershipRole, isOpen, onToggle }: SidebarProps) {
+export default function Sidebar({ user, userRole, orgMembershipRole, isOpen, onToggle, onLogout }: SidebarProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const links = getNavItems(userRole, orgMembershipRole);
 
   const isActive = (href: string) => {
     if (href === pathname) return true;
     if (href !== '/' && pathname.startsWith(href)) return true;
     return false;
-  };
-
-  const handleLogout = async () => {
-    await logout();
-    router.push('/login');
   };
 
   const initial = user.email ? user.email[0].toUpperCase() : 'U';
@@ -148,7 +142,7 @@ export default function Sidebar({ user, userRole, orgMembershipRole, isOpen, onT
 
           {/* Logout button */}
           <button
-            onClick={handleLogout}
+            onClick={onLogout}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors group relative ${
               !isOpen ? 'justify-center' : ''
             }`}

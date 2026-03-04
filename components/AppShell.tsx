@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import pb from '@/lib/pocketbase';
@@ -37,6 +37,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const authRequestIdRef = useRef(0);
+  const isLoggingOutRef = useRef(false);
   const links = getNavItems(userRole, orgMembershipRole);
 
   const isActive = (href: string) => {
@@ -81,18 +84,29 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // Auth state
   useEffect(() => {
     const updateState = async () => {
+      const requestId = ++authRequestIdRef.current;
       const currentUser = getCurrentUser();
       const currentUserRole = getUserRole();
+
+      if (isLoggingOutRef.current) {
+        return;
+      }
 
       setUser(currentUser);
       setUserRole(currentUserRole);
 
       if (currentUser && currentUserRole !== 'Applicant') {
         const membership = await getCurrentOrgMembership(currentUser.id);
+        if (isLoggingOutRef.current || requestId !== authRequestIdRef.current) {
+          return;
+        }
         setOrgMembershipRole(membership?.role ?? null);
         return;
       }
 
+      if (requestId !== authRequestIdRef.current) {
+        return;
+      }
       setOrgMembershipRole(null);
     };
     void updateState();
@@ -107,12 +121,37 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   const handleLogout = async () => {
-    await logout();
+    if (isLoggingOutRef.current) {
+      return;
+    }
+
+    isLoggingOutRef.current = true;
+    authRequestIdRef.current += 1;
+    setIsLoggingOut(true);
+    setUser(null);
+    setUserRole(null);
+    setOrgMembershipRole(null);
     setMobileMenuOpen(false);
-    router.push('/login');
+    document.body.style.overflow = '';
+
+    try {
+      await logout();
+    } finally {
+      window.location.replace('/login');
+    }
   };
 
   const isPublicPage = PUBLIC_PATHS.includes(pathname);
+
+  useEffect(() => {
+    if (!mounted || isPublicPage || user || isLoggingOut) {
+      return;
+    }
+
+    const loginUrl = new URL('/login', window.location.origin);
+    loginUrl.searchParams.set('redirect', pathname);
+    window.location.replace(loginUrl.toString());
+  }, [mounted, isPublicPage, isLoggingOut, pathname, user]);
 
   // Show loading state until mounted
   if (!mounted) {
@@ -123,8 +162,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
+  if (isLoggingOut) {
+    return <div className="min-h-screen bg-white" />;
+  }
+
+  if (!user && !isPublicPage) {
+    return <div className="min-h-screen bg-white" />;
+  }
+
   // Public pages: Navbar + content + Footer
-  if (isPublicPage || !user) {
+  if (isPublicPage) {
     return (
       <>
         <Navbar />
@@ -134,24 +181,27 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const initial = user.email ? user.email[0].toUpperCase() : 'U';
+  const authenticatedUser = user as UserRecord;
+  const authenticatedUserRole = userRole as UserRole;
+  const initial = authenticatedUser.email ? authenticatedUser.email[0].toUpperCase() : 'U';
 
   // Authenticated pages: Sidebar (desktop) + TopBar (mobile) + Mobile Drawer + content
   return (
     <>
       {/* Desktop Sidebar */}
       <Sidebar
-        user={user}
-        userRole={userRole!}
+        user={authenticatedUser}
+        userRole={authenticatedUserRole}
         orgMembershipRole={orgMembershipRole}
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
+        onLogout={handleLogout}
       />
 
       {/* Mobile TopBar */}
       <TopBar
-        user={user}
-        userRole={userRole!}
+        user={authenticatedUser}
+        userRole={authenticatedUserRole}
         orgMembershipRole={orgMembershipRole}
         mobileMenuOpen={mobileMenuOpen}
         onMenuClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -199,9 +249,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <div className="border-t border-gray-200 p-3">
           {/* User info */}
           <div className="flex items-center gap-3 px-4 py-3">
-            {user.avatar ? (
+            {authenticatedUser.avatar ? (
               <img
-                src={`${process.env.NEXT_PUBLIC_POCKETBASE_URL}/api/files/users/${user.id}/${user.avatar}`}
+                src={`${process.env.NEXT_PUBLIC_POCKETBASE_URL}/api/files/users/${authenticatedUser.id}/${authenticatedUser.avatar}`}
                 alt="Avatar"
                 className="h-10 w-10 rounded-full object-cover flex-shrink-0"
               />
@@ -211,8 +261,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               </div>
             )}
             <div className="overflow-hidden">
-              <p className="text-sm font-medium text-gray-900 truncate">{user.email}</p>
-              <p className="text-xs text-gray-500 capitalize">{orgMembershipRole || userRole}</p>
+              <p className="text-sm font-medium text-gray-900 truncate">{authenticatedUser.email}</p>
+              <p className="text-xs text-gray-500 capitalize">{orgMembershipRole || authenticatedUserRole}</p>
             </div>
           </div>
 

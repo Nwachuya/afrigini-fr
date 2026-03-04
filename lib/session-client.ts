@@ -5,6 +5,20 @@ let syncingToken: string | null = null;
 let syncRequest: Promise<void> | null = null;
 let clearRequest: Promise<void> | null = null;
 
+async function getErrorMessage(response: Response, fallback: string): Promise<string> {
+  try {
+    const data = await response.json();
+
+    if (typeof data?.error === 'string' && data.error.trim().length > 0) {
+      return data.error;
+    }
+  } catch {
+    // Ignore JSON parsing failures and fall back to the default message.
+  }
+
+  return fallback;
+}
+
 export async function syncServerSession(token: string): Promise<void> {
   if (!token) {
     return;
@@ -24,9 +38,9 @@ export async function syncServerSession(token: string): Promise<void> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token }),
-  }).then((response) => {
+  }).then(async (response) => {
     if (!response.ok) {
-      throw new Error('Failed to sync session.');
+      throw new Error(await getErrorMessage(response, 'Failed to sync session.'));
     }
 
     lastSyncedToken = token;
