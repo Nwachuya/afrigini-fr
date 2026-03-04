@@ -16,7 +16,7 @@ export default function LoginPage() {
     const message = err?.message?.toLowerCase() || '';
 
     if (isSessionSyncError(err)) {
-      return 'PocketBase accepted the login, but the app session could not be created. Check `SESSION_SECRET` and cookie settings on the deployed app.';
+      return err?.message?.replace(/^APP_SESSION_SYNC_FAILED:\s*/, '') || 'Failed to sync app session.';
     }
     
     if (message.includes('failed to authenticate') || message.includes('invalid credentials')) {
@@ -46,7 +46,7 @@ export default function LoginPage() {
       if (user.role === 'Applicant') {
         window.location.href = '/candidates/applicant';
       } else {
-        window.location.href = '/org/organization';
+        window.location.href = '/org/dashboard';
       }
     } catch (err: any) {
       setError(getErrorMessage(err));

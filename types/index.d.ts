@@ -1,7 +1,8 @@
 import PocketBase from 'pocketbase';
 
 // 1. Define specific Role types
-export type UserRole = 'Applicant' | 'Company' | 'recruiter' | 'billing' | 'owner';
+export type OrgRole = 'recruiter' | 'billing' | 'owner';
+export type UserRole = 'Applicant' | 'Company' | OrgRole;
 
 // 2. Base Record Interface (Common fields for all PB records)
 export interface BaseRecord {
@@ -114,13 +115,13 @@ export interface OrgInviteRecord extends BaseRecord {
   email: string;
   open?: boolean;
   invited_by: string;
-  role: UserRole;
+  role: OrgRole;
 }
 
 export interface OrgMemberRecord extends BaseRecord {
   organization: string;
   user: string;
-  role: UserRole;
+  role: OrgRole;
   expand?: {
     user?: UserRecord;
     organization?: OrganizationRecord;

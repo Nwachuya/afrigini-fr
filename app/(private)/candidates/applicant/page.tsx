@@ -29,7 +29,7 @@ export default function ApplicantDashboard() {
         
         // SECURITY CHECK: Redirect if not an Applicant
         if (userRecord.role !== 'Applicant') {
-          router.replace('/org/organization');
+          router.replace('/org/dashboard');
           return;
         }
 

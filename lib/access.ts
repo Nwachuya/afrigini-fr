@@ -53,7 +53,7 @@ export function getDefaultOrgPath(role?: string | null): string {
     return '/org/billing';
   }
 
-  return '/org/organization';
+  return '/org/dashboard';
 }
 
 export function getDefaultDashboardPath(

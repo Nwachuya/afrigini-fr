@@ -87,6 +87,7 @@ export async function POST(request: NextRequest) {
     const checkoutSession = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'payment',
+      client_reference_id: orgId,
       line_items: [
         {
           price: priceId,
@@ -96,6 +97,12 @@ export async function POST(request: NextRequest) {
       metadata: {
         orgId: orgId,
         price_id: priceId,
+      },
+      payment_intent_data: {
+        metadata: {
+          orgId: orgId,
+          price_id: priceId,
+        },
       },
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/org/billing?success=true`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/org/billing?canceled=true`,

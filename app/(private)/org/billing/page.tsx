@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { ExternalLink, RefreshCcw } from 'lucide-react';
 import pb from '@/lib/pocketbase';
-import { UserRecord } from '@/types';
+import { OrgRole, UserRecord } from '@/types';
 import { canAccessBilling, getDefaultOrgPath } from '@/lib/access';
 import { getCurrentOrgMembership } from '@/lib/org-membership';
 
@@ -13,6 +14,7 @@ interface Plan {
   cost: number;
   credit: number;
   price_id: string;
+  payment_link?: string;
 }
 
 interface Payment {
@@ -24,103 +26,228 @@ interface Payment {
   payer_email: string;
 }
 
+type BannerState = {
+  text: string;
+  type: '' | 'success' | 'error' | 'info';
+};
+
+type PaymentLoadState = {
+  error: string;
+  loading: boolean;
+};
+
+function formatCurrency(amount: number) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(amount / 100);
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function getCheckoutMode(plan: Plan) {
+  if (plan.price_id) {
+    return {
+      label: 'App Checkout',
+      tone: 'border-brand-green/15 bg-brand-green/10 text-brand-green',
+    };
+  }
+
+  if (plan.payment_link) {
+    return {
+      label: 'Legacy Link',
+      tone: 'border-yellow-200 bg-yellow-50 text-yellow-700',
+    };
+  }
+
+  return {
+    label: 'Needs Setup',
+    tone: 'border-red-200 bg-red-50 text-red-700',
+  };
+}
+
 function BillingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [processing, setProcessing] = useState<string | null>(null);
-  const [message, setMessage] = useState({ text: '', type: '' });
-  
+  const [banner, setBanner] = useState<BannerState>({ text: '', type: '' });
+
   const [orgId, setOrgId] = useState<string | null>(null);
   const [orgName, setOrgName] = useState('');
+  const [memberRole, setMemberRole] = useState<OrgRole | null>(null);
   const [userEmail, setUserEmail] = useState('');
   const [credits, setCredits] = useState<number>(0);
   const [plans, setPlans] = useState<Plan[]>([]);
-  
+  const [plansError, setPlansError] = useState('');
+  const [orgError, setOrgError] = useState('');
+
   const [payments, setPayments] = useState<Payment[]>([]);
   const [paymentsPage, setPaymentsPage] = useState(1);
   const [totalPayments, setTotalPayments] = useState(0);
-  const [loadingPayments, setLoadingPayments] = useState(false);
-  const perPage = 5;
-  
+  const [paymentLoadState, setPaymentLoadState] = useState<PaymentLoadState>({
+    error: '',
+    loading: false,
+  });
+
   const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
+
+  const perPage = 5;
+  const totalPages = Math.ceil(totalPayments / perPage);
 
   useEffect(() => {
     if (searchParams.get('success') === 'true') {
-      setMessage({ text: 'Payment successful! Credits have been added.', type: 'success' });
+      setBanner({
+        text: 'Payment completed. Credits are processed separately and may take a moment to appear below.',
+        type: 'success',
+      });
     } else if (searchParams.get('canceled') === 'true') {
-      setMessage({ text: 'Payment was canceled.', type: 'error' });
+      setBanner({
+        text: 'Payment was canceled before checkout completed.',
+        type: 'error',
+      });
     }
   }, [searchParams]);
 
   useEffect(() => {
-    const loadBilling = async () => {
-      try {
-        const user = pb.authStore.model as unknown as UserRecord;
-        if (!user) {
-          router.push('/login');
-          return;
-        }
+    void loadBilling(true);
+  }, [router]);
 
-        setUserEmail(user.email || '');
+  useEffect(() => {
+    if (!orgId) {
+      return;
+    }
 
-        const memberRes = await getCurrentOrgMembership(user.id, 'organization');
+    void loadPayments(orgId, paymentsPage);
+  }, [orgId, paymentsPage]);
 
-        if (memberRes && memberRes.organization && canAccessBilling(memberRes.role)) {
-          const org = memberRes.expand?.organization as any;
-          setOrgId(org.id);
-          setOrgName(org.name || '');
-          setCredits(org.job_credits || 0);
-        } else if (memberRes?.role) {
+  const loadBilling = async (initial = false) => {
+    if (!initial) {
+      setRefreshing(true);
+    }
+
+    try {
+      setOrgError('');
+      setPlansError('');
+
+      const user = pb.authStore.model as unknown as UserRecord;
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+
+      setUserEmail(user.email || '');
+
+      const memberRes = await getCurrentOrgMembership(user.id, 'organization');
+
+      if (!(memberRes && memberRes.organization && canAccessBilling(memberRes.role))) {
+        if (memberRes?.role) {
           router.replace(getDefaultOrgPath(memberRes.role));
           return;
-        } else {
-          setMessage({ text: 'No organization found.', type: 'error' });
         }
 
+        setOrgError('No billing-enabled organization membership was found for your account.');
+        return;
+      }
+
+      const organizationId = memberRes.organization;
+      setOrgId(organizationId);
+      setMemberRole(memberRes.role ?? null);
+
+      let resolvedOrgName = 'Organization';
+      let resolvedCredits = 0;
+      const expandedOrg = memberRes.expand?.organization as
+        | { id?: string; name?: string; job_credits?: number }
+        | undefined;
+
+      if (expandedOrg?.name || typeof expandedOrg?.job_credits === 'number') {
+        resolvedOrgName = expandedOrg?.name || resolvedOrgName;
+        resolvedCredits = expandedOrg?.job_credits || 0;
+      } else {
+        try {
+          const organization = await pb.collection('organizations').getOne(organizationId, {
+            requestKey: null,
+          });
+          resolvedOrgName = organization.name || resolvedOrgName;
+          resolvedCredits = organization.job_credits || 0;
+        } catch (error) {
+          console.error('Error loading organization details for billing:', error);
+        }
+      }
+
+      setOrgName(resolvedOrgName);
+      setCredits(resolvedCredits);
+
+      try {
         const plansRes = await pb.collection('plans').getFullList<Plan>({
           sort: 'cost',
           requestKey: null,
         });
         setPlans(plansRes);
-
-      } catch (err) {
-        console.error("Error loading billing data:", err);
-      } finally {
-        setLoading(false);
+      } catch (error) {
+        console.error('Error loading plans:', error);
+        setPlans([]);
+        setPlansError('We could not load available credit packs right now.');
       }
-    };
-    loadBilling();
-  }, [router]);
+    } catch (error) {
+      console.error('Error loading billing data:', error);
+      setOrgError('We could not load your billing workspace. Please try again.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
-  useEffect(() => {
-    if (!orgId) return;
+  const loadPayments = async (organizationId: string, page: number) => {
+    setPaymentLoadState({ error: '', loading: true });
 
-    const loadPayments = async () => {
-      setLoadingPayments(true);
-      try {
-        const res = await pb.collection('payments').getList<Payment>(paymentsPage, perPage, {
-          filter: `org_id = "${orgId}"`,
-          sort: '-created',
-          requestKey: null,
-        });
-        setPayments(res.items);
-        setTotalPayments(res.totalItems);
-      } catch (err) {
-        console.error("Error loading payments:", err);
-      } finally {
-        setLoadingPayments(false);
-      }
-    };
-    loadPayments();
-  }, [orgId, paymentsPage]);
+    try {
+      const res = await pb.collection('payments').getList<Payment>(page, perPage, {
+        filter: `org_id = "${organizationId}"`,
+        sort: '-created',
+        requestKey: null,
+      });
+      setPayments(res.items);
+      setTotalPayments(res.totalItems);
+      setPaymentLoadState({ error: '', loading: false });
+    } catch (error) {
+      console.error('Error loading payments:', error);
+      setPayments([]);
+      setTotalPayments(0);
+      setPaymentLoadState({
+        error: 'We could not load payment history right now.',
+        loading: false,
+      });
+    }
+  };
 
   const handleBuyCredits = async (plan: Plan) => {
-    if (!orgId) return;
-    
+    if (!orgId) {
+      setBanner({
+        text: 'Your organization could not be resolved for checkout.',
+        type: 'error',
+      });
+      return;
+    }
+
+    if (!plan.price_id) {
+      setBanner({
+        text: 'This plan is not configured for in-app checkout yet. Credits can only be allocated through the app checkout flow.',
+        type: 'error',
+      });
+      return;
+    }
+
     setProcessing(plan.id);
-    setMessage({ text: '', type: '' });
+    setBanner({ text: '', type: '' });
 
     try {
       const response = await fetch('/api/checkout', {
@@ -140,16 +267,16 @@ function BillingContent() {
         throw new Error(data.error || 'Failed to create checkout session');
       }
 
-      window.location.href = data.url;
-
+      window.location.assign(data.url);
     } catch (err: any) {
-      console.error("Checkout error:", err);
-      setMessage({ text: err.message || 'Failed to start checkout.', type: 'error' });
+      console.error('Checkout error:', err);
+      setBanner({
+        text: err.message || 'Failed to start checkout.',
+        type: 'error',
+      });
       setProcessing(null);
     }
   };
-
-  const totalPages = Math.ceil(totalPayments / perPage);
 
   if (loading) {
     return (
@@ -162,190 +289,313 @@ function BillingContent() {
   if (!orgId) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-4 rounded-lg">
-          Could not load organization.
+        <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-4 text-yellow-800">
+          {orgError || 'Could not load organization.'}
         </div>
       </div>
     );
   }
 
+  const balanceStatus =
+    credits > 0
+      ? 'You have credits available for new job posts.'
+      : 'You have no credits available. Purchase a pack to post new roles.';
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Billing</h1>
-        <p className="text-gray-500 mt-1">Manage your job credits.</p>
+      <div className="flex flex-col gap-4 rounded-2xl border border-brand-green/10 bg-white px-6 py-7 shadow-sm md:flex-row md:items-center md:justify-between">
+        <div>
+          <span className="text-brand-green font-bold tracking-[0.2em] uppercase text-xs">Organization</span>
+          <h1 className="mt-2 text-3xl font-bold text-brand-dark">Billing</h1>
+          <p className="mt-1 text-gray-500">
+            Manage credits and payment history for{' '}
+            <span className="font-semibold text-brand-dark">{orgName}</span>.
+          </p>
+          {memberRole && (
+            <p className="mt-3 inline-flex rounded-full border border-brand-green/15 bg-brand-green/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-brand-green">
+              {memberRole} access
+            </p>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => void loadBilling(false)}
+          disabled={refreshing}
+          className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-green/20 bg-white px-4 py-2.5 text-sm font-medium text-brand-dark transition-colors hover:bg-brand-green/5 disabled:opacity-60"
+        >
+          <RefreshCcw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          {refreshing ? 'Refreshing...' : 'Refresh'}
+        </button>
       </div>
 
-      {message.text && (
-        <div className={`p-4 rounded-lg text-sm font-medium ${
-          message.type === 'success' 
-            ? 'bg-green-50 text-green-700 border border-green-200' 
-            : 'bg-red-50 text-red-700 border border-red-200'
-        }`}>
-          {message.text}
+      {banner.text && (
+        <div
+          className={`rounded-xl border px-5 py-4 text-sm font-medium ${
+            banner.type === 'success'
+              ? 'border-green-200 bg-green-50 text-green-700'
+              : banner.type === 'error'
+                ? 'border-red-200 bg-red-50 text-red-700'
+                : 'border-brand-green/15 bg-brand-green/5 text-brand-dark'
+          }`}
+        >
+          {banner.text}
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        
-        <div className="md:col-span-1">
-          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-            <h2 className="text-gray-500 text-sm font-bold uppercase tracking-wider">Current Balance</h2>
-            <div className="flex items-baseline gap-2 mt-4">
-              <span className="text-5xl font-bold text-gray-900">{credits}</span>
-              <span className="text-gray-500 font-medium">Job Credits</span>
+      <div className="grid gap-8 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <aside className="space-y-6 xl:sticky xl:top-6 xl:self-start">
+          <div className="rounded-2xl border border-brand-green/10 bg-white p-6 shadow-sm">
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-gray-500">Current Balance</p>
+            <div className="mt-4 flex items-baseline gap-3">
+              <span className="text-5xl font-bold text-brand-dark">{credits}</span>
+              <span className="text-sm font-medium text-gray-500">Job Credits</span>
             </div>
-            <p className="text-xs text-gray-400 mt-2">Credits are used to post new jobs.</p>
+            <p className="mt-3 text-sm text-gray-500">{balanceStatus}</p>
           </div>
-        </div>
 
-        <div className="md:col-span-2">
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
-            <div className="p-6 border-b border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-900">Purchase More Credits</h2>
-            </div>
-            <div className="p-6 space-y-4">
-              <p className="text-sm text-gray-600">
-                Need to post more jobs? Choose a credit pack below.
-              </p>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
-                {plans.map((plan, index) => (
-                  <div 
-                    key={plan.id}
-                    className={`border rounded-lg p-4 flex flex-col items-center text-center relative ${
-                      index === plans.length - 1 
-                        ? 'border-blue-600 bg-blue-50/50' 
-                        : 'border-gray-200'
-                    }`}
-                  >
-                    {index === plans.length - 1 && (
-                      <span className="absolute top-2 right-2 text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full font-semibold">
-                        Best Value
-                      </span>
-                    )}
-                    <span className="text-3xl">{'🪙'.repeat(Math.min(plan.credit, 3))}</span>
-                    <h3 className="font-bold text-gray-900 mt-2">{plan.plan}</h3>
-                    <p className="text-sm text-gray-500">{plan.credit} Credits</p>
-                    <p className="text-lg font-semibold text-blue-600 mt-1">
-                      ${(plan.cost / 100).toFixed(2)}
-                    </p>
-                    <button 
-                      onClick={() => handleBuyCredits(plan)}
-                      disabled={processing !== null}
-                      className="mt-4 w-full px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-70 transition-colors"
-                    >
-                      {processing === plan.id ? 'Redirecting...' : 'Purchase'}
-                    </button>
-                  </div>
-                ))}
+          <div className="rounded-2xl border border-brand-green/10 bg-white p-6 shadow-sm">
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-gray-500">Billing Context</p>
+            <dl className="mt-4 space-y-3 text-sm">
+              <div className="flex items-start justify-between gap-4">
+                <dt className="text-gray-500">Organization</dt>
+                <dd className="text-right font-medium text-brand-dark">{orgName}</dd>
               </div>
-            </div>
+              <div className="flex items-start justify-between gap-4">
+                <dt className="text-gray-500">Access role</dt>
+                <dd className="text-right font-medium capitalize text-brand-dark">{memberRole || 'Unknown'}</dd>
+              </div>
+              <div className="flex items-start justify-between gap-4">
+                <dt className="text-gray-500">Checkout email</dt>
+                <dd className="max-w-[170px] break-words text-right font-medium text-brand-dark">{userEmail}</dd>
+              </div>
+            </dl>
           </div>
-        </div>
-      </div>
+        </aside>
 
-      {/* Payment History */}
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
-        <div className="p-6 border-b border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-900">Payment History</h2>
-        </div>
-        <div className="p-6">
-          {loadingPayments ? (
-            <p className="text-gray-500 text-center py-4">Loading payments...</p>
-          ) : payments.length === 0 ? (
-            <p className="text-gray-500 text-center py-4">No payments yet.</p>
-          ) : (
-            <>
-              <table className="w-full">
-                <thead>
-                  <tr className="text-left text-sm text-gray-500 border-b">
-                    <th className="pb-3 font-medium">Date</th>
-                    <th className="pb-3 font-medium">Amount</th>
-                    <th className="pb-3 font-medium">Status</th>
-                    <th className="pb-3 font-medium text-right">Invoice</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {payments.map((payment) => (
-                    <tr key={payment.id} className="border-b last:border-0">
-                      <td className="py-3 text-sm text-gray-900">
-                        {new Date(payment.created).toLocaleDateString()}
-                      </td>
-                      <td className="py-3 text-sm text-gray-900">
-                        ${(payment.amount / 100).toFixed(2)}
-                      </td>
-                      <td className="py-3">
-                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                          payment.status === 'allocated' 
-                            ? 'bg-green-100 text-green-700' 
-                            : 'bg-yellow-100 text-yellow-700'
-                        }`}>
-                          {payment.status}
-                        </span>
-                      </td>
-                      <td className="py-3 text-right">
-                        {payment.invoice_url ? (
+        <div className="space-y-8">
+          <section className="rounded-2xl border border-brand-green/10 bg-white shadow-sm">
+            <div className="border-b border-brand-green/10 p-6">
+              <h2 className="text-lg font-semibold text-brand-dark">Purchase More Credits</h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Billing and owner roles can purchase credit packs for this organization.
+              </p>
+            </div>
+
+            <div className="p-6">
+              {plansError ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {plansError}
+                </div>
+              ) : plans.length === 0 ? (
+                <div className="rounded-xl border border-brand-green/10 bg-brand-green/5 px-4 py-8 text-center text-sm text-gray-600">
+                  No credit packs are available right now.
+                </div>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {plans.map((plan, index) => (
+                    <div
+                      key={plan.id}
+                      className={`relative flex flex-col rounded-2xl border p-5 shadow-sm ${
+                        index === plans.length - 1
+                          ? 'border-brand-green bg-brand-green/5'
+                          : 'border-brand-green/10 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <h3 className="text-lg font-semibold text-brand-dark">{plan.plan}</h3>
+                        {index === plans.length - 1 && (
+                          <span className="rounded-full bg-brand-green px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white">
+                            Best Value
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-sm text-gray-500">{plan.credit} Credits</p>
+
+                      <span
+                        className={`mt-4 inline-flex w-fit rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${getCheckoutMode(plan).tone}`}
+                      >
+                        {getCheckoutMode(plan).label}
+                      </span>
+
+                      <p className="mt-6 text-3xl font-bold text-brand-dark">
+                        {formatCurrency(plan.cost)}
+                      </p>
+                      <p className="mt-1 text-sm text-gray-500">
+                        ${(plan.cost / Math.max(plan.credit, 1) / 100).toFixed(2)} per credit
+                      </p>
+                      {!plan.price_id && (
+                        <p className="mt-3 text-sm text-yellow-700">
+                          This pack needs a Stripe price id before credits can be allocated automatically.
+                        </p>
+                      )}
+
+                      <button
+                        onClick={() => handleBuyCredits(plan)}
+                        disabled={processing !== null || !plan.price_id}
+                        className="mt-6 w-full rounded-lg bg-brand-green px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-green-800 disabled:opacity-60"
+                      >
+                        {processing === plan.id ? 'Redirecting...' : 'Purchase'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-brand-green/10 bg-white shadow-sm">
+            <div className="border-b border-brand-green/10 p-6">
+              <h2 className="text-lg font-semibold text-brand-dark">Payment History</h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Previous Stripe payments and available receipts for this organization.
+              </p>
+            </div>
+
+            <div className="p-6">
+              {paymentLoadState.loading ? (
+                <p className="py-4 text-center text-gray-500">Loading payments...</p>
+              ) : paymentLoadState.error ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {paymentLoadState.error}
+                </div>
+              ) : payments.length === 0 ? (
+                <div className="rounded-xl border border-brand-green/10 bg-brand-green/5 px-4 py-8 text-center text-sm text-gray-600">
+                  No payments yet.
+                </div>
+              ) : (
+                <>
+                  <div className="hidden overflow-x-auto md:block">
+                    <table className="w-full">
+                      <thead className="border-b border-brand-green/10 bg-brand-green/5 text-left text-sm text-gray-500">
+                        <tr>
+                          <th className="px-4 py-3 font-medium">Date</th>
+                          <th className="px-4 py-3 font-medium">Amount</th>
+                          <th className="px-4 py-3 font-medium">Status</th>
+                          <th className="px-4 py-3 font-medium">Payer</th>
+                          <th className="px-4 py-3 text-right font-medium">Receipt</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-brand-green/10">
+                        {payments.map((payment) => (
+                          <tr key={payment.id} className="hover:bg-brand-green/5 transition-colors">
+                            <td className="px-4 py-4 text-sm text-brand-dark">{formatDate(payment.created)}</td>
+                            <td className="px-4 py-4 text-sm font-medium text-brand-dark">
+                              {formatCurrency(payment.amount)}
+                            </td>
+                            <td className="px-4 py-4">
+                              <PaymentStatus status={payment.status} />
+                            </td>
+                            <td className="px-4 py-4 text-sm text-gray-500">{payment.payer_email || '—'}</td>
+                            <td className="px-4 py-4 text-right">
+                              {payment.invoice_url ? (
+                                <button
+                                  onClick={() => setInvoiceUrl(payment.invoice_url)}
+                                  className="text-sm font-medium text-brand-green hover:text-green-800"
+                                >
+                                  View Receipt
+                                </button>
+                              ) : (
+                                <span className="text-sm text-gray-400">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="space-y-4 md:hidden">
+                    {payments.map((payment) => (
+                      <div
+                        key={payment.id}
+                        className="rounded-2xl border border-brand-green/10 bg-white p-4 shadow-sm"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className="text-sm text-gray-500">{formatDate(payment.created)}</p>
+                            <p className="mt-1 text-lg font-semibold text-brand-dark">
+                              {formatCurrency(payment.amount)}
+                            </p>
+                          </div>
+                          <PaymentStatus status={payment.status} />
+                        </div>
+                        <p className="mt-3 text-sm text-gray-500">
+                          {payment.payer_email || 'No payer email recorded'}
+                        </p>
+                        {payment.invoice_url && (
                           <button
                             onClick={() => setInvoiceUrl(payment.invoice_url)}
-                            className="text-sm text-blue-600 hover:underline"
+                            className="mt-4 text-sm font-medium text-brand-green hover:text-green-800"
                           >
                             View Receipt
                           </button>
-                        ) : (
-                          <span className="text-sm text-gray-400">—</span>
                         )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                  <p className="text-sm text-gray-500">
-                    Showing {((paymentsPage - 1) * perPage) + 1} to {Math.min(paymentsPage * perPage, totalPayments)} of {totalPayments}
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setPaymentsPage(p => Math.max(1, p - 1))}
-                      disabled={paymentsPage === 1}
-                      className="px-3 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Previous
-                    </button>
-                    <button
-                      onClick={() => setPaymentsPage(p => Math.min(totalPages, p + 1))}
-                      disabled={paymentsPage === totalPages}
-                      className="px-3 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Next
-                    </button>
+                      </div>
+                    ))}
                   </div>
-                </div>
+
+                  {totalPages > 1 && (
+                    <div className="mt-6 flex flex-col gap-3 border-t border-brand-green/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-sm text-gray-500">
+                        Showing {((paymentsPage - 1) * perPage) + 1} to{' '}
+                        {Math.min(paymentsPage * perPage, totalPayments)} of {totalPayments}
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setPaymentsPage((page) => Math.max(1, page - 1))}
+                          disabled={paymentsPage === 1}
+                          className="rounded-lg border border-brand-green/20 px-3 py-1.5 text-sm text-brand-dark transition-colors hover:bg-brand-green/5 disabled:opacity-50"
+                        >
+                          Previous
+                        </button>
+                        <button
+                          onClick={() => setPaymentsPage((page) => Math.min(totalPages, page + 1))}
+                          disabled={paymentsPage === totalPages}
+                          className="rounded-lg border border-brand-green/20 px-3 py-1.5 text-sm text-brand-dark transition-colors hover:bg-brand-green/5 disabled:opacity-50"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
-            </>
-          )}
+            </div>
+          </section>
         </div>
       </div>
 
-      {/* Invoice Modal */}
       {invoiceUrl && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="font-semibold text-gray-900">Receipt</h3>
-              <button
-                onClick={() => setInvoiceUrl(null)}
-                className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
-              >
-                &times;
-              </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="flex h-[80vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-brand-green/10 p-4">
+              <div>
+                <h3 className="font-semibold text-brand-dark">Receipt</h3>
+                <p className="text-sm text-gray-500">Preview the Stripe receipt below or open it in a new tab.</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <a
+                  href={invoiceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-lg border border-brand-green/20 px-3 py-2 text-sm font-medium text-brand-dark transition-colors hover:bg-brand-green/5"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Open
+                </a>
+                <button
+                  onClick={() => setInvoiceUrl(null)}
+                  className="rounded-lg px-3 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                >
+                  Close
+                </button>
+              </div>
             </div>
-            <div className="flex-1 p-4">
+            <div className="flex-1 bg-gray-50 p-4">
               <iframe
                 src={invoiceUrl}
-                className="w-full h-full border rounded"
+                className="h-full w-full rounded-xl border border-brand-green/10 bg-white"
                 title="Receipt"
               />
             </div>
@@ -356,13 +606,29 @@ function BillingContent() {
   );
 }
 
+function PaymentStatus({ status }: { status: string }) {
+  const normalized = status.toLowerCase();
+  const className =
+    normalized === 'allocated'
+      ? 'border-green-200 bg-green-50 text-green-700'
+      : 'border-yellow-200 bg-yellow-50 text-yellow-700';
+
+  return (
+    <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium capitalize ${className}`}>
+      {status}
+    </span>
+  );
+}
+
 export default function BillingPage() {
   return (
-    <Suspense fallback={
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center text-gray-500">
-        Loading billing...
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center text-gray-500">
+          Loading billing...
+        </div>
+      }
+    >
       <BillingContent />
     </Suspense>
   );

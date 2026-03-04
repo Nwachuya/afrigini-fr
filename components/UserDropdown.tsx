@@ -68,7 +68,7 @@ export default function UserDropdown({
                 <Link href="/org/billing" className="block px-4 py-2 text-sm hover:bg-gray-100">Billing</Link>
               )}
               {canManageOrganization(orgMembershipRole) && (
-                <Link href="/org/organization-settings" className="block px-4 py-2 text-sm hover:bg-gray-100">Organization Settings</Link>
+                <Link href="/org/settings" className="block px-4 py-2 text-sm hover:bg-gray-100">Organization Settings</Link>
               )}
               {(canManageTeam(orgMembershipRole) ||
                 canAccessBilling(orgMembershipRole) ||

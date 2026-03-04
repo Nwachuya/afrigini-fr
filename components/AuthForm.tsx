@@ -20,7 +20,7 @@ export default function AuthForm({ type }: { type: 'login' | 'register' }) {
       else user = await register(email, password, confirmPassword, role);
       
       if (user?.role === 'Applicant') router.push('/candidates/applicant');
-      else router.push('/org/organization');
+      else router.push('/org/dashboard');
     } catch (err: any) {
       setError(err.message || 'Error');
     }

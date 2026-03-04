@@ -22,7 +22,7 @@ export default function DashboardRootPage() {
       router.replace('/candidates/applicant');
     } else {
       // Assumes 'Company', 'recruiter', 'owner', 'billing' go to org dashboard
-      router.replace('/org/organization');
+      router.replace('/org/dashboard');
     }
   }, [router]);
 

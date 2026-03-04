@@ -29,7 +29,7 @@ export default function RegisterPage() {
     }
 
     if (isSessionSyncError(err)) {
-      return 'Account authentication succeeded, but the app session could not be created. Check `SESSION_SECRET` on the deployed app and try logging in again.';
+      return message.replace(/^APP_SESSION_SYNC_FAILED:\s*/, '') || 'Failed to sync app session.';
     }
 
     if (lower.includes('already exists') || lower.includes('not unique') || lower.includes('failed to create record')) {
@@ -60,7 +60,7 @@ export default function RegisterPage() {
       if (user.role === 'Applicant') {
         router.push('/candidates/applicant');
       } else {
-        router.push('/org/organization');
+        router.push('/org/dashboard');
       }
     } catch (err: unknown) {
       setError(getErrorMessage(err));

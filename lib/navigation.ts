@@ -69,7 +69,7 @@ export function getNavItems(
   }
 
   if (canManageOrganization(orgMembershipRole)) {
-    items.push({ label: 'Organization', href: '/org/organization-settings', icon: 'building2' });
+    items.push({ label: 'Organization', href: '/org/settings', icon: 'building2' });
   }
 
   return items;
