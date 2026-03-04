@@ -37,7 +37,7 @@ export function getNavItems(
       { label: 'Jobs', href: '/candidates/jobs', icon: 'briefcase' },
       { label: 'My Applications', href: '/candidates/my-applications', icon: 'fileText' },
       { label: 'My Profile', href: '/candidates/my-profile', icon: 'user' },
-      { label: 'Settings', href: '/candidates/account-settings', icon: 'settings' },
+      { label: 'Settings', href: '/candidates/settings', icon: 'settings' },
     ];
   }
 

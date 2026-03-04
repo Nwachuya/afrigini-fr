@@ -31,6 +31,7 @@ export interface CandidateProfileRecord extends BaseRecord {
   lastName?: string;
   headline?: string;
   bio?: string;
+  headshot?: string;
   resume?: string;
   resume_generated?: string;
   resume_generated_redacted?: string;

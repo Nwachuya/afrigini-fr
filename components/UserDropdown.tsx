@@ -80,7 +80,7 @@ export default function UserDropdown({
 
           {/* Common Menu Items */}
           {userRole === 'Applicant' && (
-            <Link href="/candidates/account-settings" className="block px-4 py-2 text-sm hover:bg-gray-100">Account Settings</Link>
+            <Link href="/candidates/settings" className="block px-4 py-2 text-sm hover:bg-gray-100">Account Settings</Link>
           )}
           
           <div className="border-t border-gray-100 my-1"></div>
