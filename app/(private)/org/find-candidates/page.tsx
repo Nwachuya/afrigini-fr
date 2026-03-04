@@ -550,52 +550,57 @@ export default function FindCandidatesPage() {
                   href={`/org/find-candidates/${candidate.id}`}
                   className="block rounded-t-2xl p-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-green"
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-14 w-14 items-center justify-center rounded-full border border-green-100 bg-green-50 text-xl font-bold text-brand-green">
-                        {initials}
-                      </div>
-                      <div>
-                        <h2 className="text-lg font-bold text-brand-dark">{fullName}</h2>
-                        <p className="text-sm text-gray-500">{candidate.headline || 'No headline provided'}</p>
-                      </div>
+                  <div className="flex items-start gap-4">
+                    <div className="shrink-0 flex h-14 w-14 items-center justify-center rounded-full border border-green-100 bg-green-50 text-xl font-bold text-brand-green">
+                      {initials}
                     </div>
-                    <span className="rounded-full border border-brand-green/20 bg-brand-green/10 px-3 py-1 text-xs font-semibold text-brand-green">
-                      Open to work
-                    </span>
+                    <div className="min-w-0 flex-1">
+                      <h2 className="line-clamp-2 text-lg font-bold text-brand-dark break-words">{fullName}</h2>
+                      <p className="mt-1 line-clamp-2 text-sm text-gray-500 break-words">{candidate.headline || 'No headline provided'}</p>
+                    </div>
                   </div>
 
                   <div className="mt-5 grid grid-cols-1 gap-3 text-sm text-gray-600 sm:grid-cols-2">
-                    <div>
-                      <span className="font-medium text-brand-dark">Location:</span> {candidate.country || 'Not specified'}
+                    <div className="min-w-0">
+                      <span className="font-medium text-brand-dark">Location:</span>{' '}
+                      <span className="truncate align-bottom inline-block max-w-[calc(100%-4.75rem)]">
+                        {candidate.country || 'Not specified'}
+                      </span>
                     </div>
                     <div>
                       <span className="font-medium text-brand-dark">Updated:</span> {formatDate(candidate.updated)}
                     </div>
+                    <div className="sm:col-span-2">
+                      <span className="inline-flex items-center gap-2 rounded-full border border-brand-green/20 bg-brand-green/10 px-3 py-1 text-xs font-semibold text-brand-green">
+                        <span className="h-2 w-2 animate-pulse rounded-full bg-brand-green" />
+                        Open
+                      </span>
+                    </div>
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-2">
-                    {skillTags.slice(0, 5).map((skill) => (
+                    {skillTags.slice(0, 4).map((skill) => (
                       <span
                         key={skill}
-                        className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600"
+                        className="max-w-full truncate rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600"
+                        title={skill}
                       >
                         {skill}
                       </span>
                     ))}
-                    {skillTags.length > 5 && (
-                      <span className="px-1 py-1 text-xs text-gray-400">+{skillTags.length - 5}</span>
+                    {skillTags.length > 4 && (
+                      <span className="px-1 py-1 text-xs text-gray-400">+{skillTags.length - 4}</span>
                     )}
                   </div>
 
                   <div className="mt-5 flex flex-wrap gap-2 text-xs font-medium text-gray-500">
-                    <span className={`rounded-full px-2.5 py-1 ${hasResume ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                    <span className={`max-w-full truncate rounded-full px-2.5 py-1 ${hasResume ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                       {hasResume ? 'Resume' : 'No resume'}
                     </span>
-                    <span className={`rounded-full px-2.5 py-1 ${hasPortfolio ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                    <span className={`max-w-full truncate rounded-full px-2.5 py-1 ${hasPortfolio ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                       {hasPortfolio ? 'Portfolio' : 'No portfolio'}
                     </span>
-                    <span className={`rounded-full px-2.5 py-1 ${hasLinkedIn ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                    <span className={`max-w-full truncate rounded-full px-2.5 py-1 ${hasLinkedIn ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                       {hasLinkedIn ? 'LinkedIn' : 'No LinkedIn'}
                     </span>
                   </div>
