@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import type { UserRole } from '@/types';
 import {
+  canAccessCandidateNamespace,
+  canAccessOrgNamespace,
+  getDefaultDashboardPath,
+} from '@/lib/access';
+import {
   APP_SESSION_COOKIE,
   PB_TOKEN_COOKIE,
   SESSION_COOKIE_OPTIONS,
@@ -88,6 +93,8 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const sessionCookie = request.cookies.get(APP_SESSION_COOKIE)?.value;
   const isPublicPath = PUBLIC_PATHS.includes(pathname);
+  const isCandidatePath = pathname.startsWith('/candidates');
+  const isOrgPath = pathname.startsWith('/org');
   const pbToken = request.cookies.get(PB_TOKEN_COOKIE)?.value;
 
   if (!isSessionConfigured()) {
@@ -139,11 +146,23 @@ export async function middleware(request: NextRequest) {
     role: refreshed.record.role,
     email: refreshed.record.email,
   });
-  const dashboardPath = refreshed.record.role === 'Applicant'
-    ? '/dashboard/applicant'
-    : '/dashboard/organization';
+  const dashboardPath = getDefaultDashboardPath(refreshed.record.role);
 
   if (isPublicPath) {
+    const response = NextResponse.redirect(new URL(dashboardPath, request.url));
+    response.cookies.set(APP_SESSION_COOKIE, nextSessionToken, SESSION_COOKIE_OPTIONS);
+    response.cookies.set(PB_TOKEN_COOKIE, refreshed.token, SESSION_COOKIE_OPTIONS);
+    return response;
+  }
+
+  if (isCandidatePath && !canAccessCandidateNamespace(refreshed.record.role)) {
+    const response = NextResponse.redirect(new URL(dashboardPath, request.url));
+    response.cookies.set(APP_SESSION_COOKIE, nextSessionToken, SESSION_COOKIE_OPTIONS);
+    response.cookies.set(PB_TOKEN_COOKIE, refreshed.token, SESSION_COOKIE_OPTIONS);
+    return response;
+  }
+
+  if (isOrgPath && !canAccessOrgNamespace(refreshed.record.role)) {
     const response = NextResponse.redirect(new URL(dashboardPath, request.url));
     response.cookies.set(APP_SESSION_COOKIE, nextSessionToken, SESSION_COOKIE_OPTIONS);
     response.cookies.set(PB_TOKEN_COOKIE, refreshed.token, SESSION_COOKIE_OPTIONS);

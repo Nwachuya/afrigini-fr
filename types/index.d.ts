@@ -62,7 +62,7 @@ export interface OrganizationRecord extends BaseRecord {
 
 export interface JobRecord extends BaseRecord {
   role: string;
-  department?: string[]; // Array of IDs
+  department?: string | string[];
   organization: string;
   description?: string;
   benefits?: string;
@@ -88,7 +88,7 @@ export interface JobRecord extends BaseRecord {
 
 export interface JobApplicationRecord extends BaseRecord {
   job: string;
-  applicant: string; // Candidate Profile ID
+  applicant: string; // User ID
   stage: 'Applied' | 'Review' | 'Invited' | 'Send Video' | 'Interview' | 'Rejected' | 'Accepted' | 'Completed' | 'Invite';
   cover_letter?: string;
   resume_file?: string;

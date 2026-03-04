@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import PocketBase from 'pocketbase';
 import { APP_SESSION_COOKIE, PB_TOKEN_COOKIE, verifySessionToken } from '@/lib/session';
+import { canAccessBilling } from '@/lib/access';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2026-01-28.clover',
@@ -35,12 +36,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    let membership;
     try {
-      await pb.collection('org_members').getFirstListItem(
+      membership = await pb.collection('org_members').getFirstListItem(
         `user = "${authenticatedSession.userId}" && organization = "${orgId}"`,
         { requestKey: null }
       );
     } catch {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403 }
+      );
+    }
+
+    if (!canAccessBilling(membership.role)) {
       return NextResponse.json(
         { error: 'Forbidden' },
         { status: 403 }
@@ -88,8 +97,8 @@ export async function POST(request: NextRequest) {
         orgId: orgId,
         price_id: priceId,
       },
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing?success=true`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing?canceled=true`,
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/org/billing?success=true`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/org/billing?canceled=true`,
     });
 
     return NextResponse.json({ url: checkoutSession.url });

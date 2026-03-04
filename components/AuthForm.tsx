@@ -19,8 +19,8 @@ export default function AuthForm({ type }: { type: 'login' | 'register' }) {
       if (type === 'login') user = await login(email, password);
       else user = await register(email, password, confirmPassword, role);
       
-      if (user?.role === 'Applicant') router.push('/dashboard/applicant');
-      else router.push('/dashboard/organization');
+      if (user?.role === 'Applicant') router.push('/candidates/applicant');
+      else router.push('/org/organization');
     } catch (err: any) {
       setError(err.message || 'Error');
     }

@@ -798,11 +798,11 @@
     },
     {
         "id": "pbc_3985151521",
-        "listRule": "@collection.org_members.organization ?= application.job.organization && @collection.org_members.user ?= @request.auth.id",
-        "viewRule": "@collection.org_members.organization ?= application.job.organization && @collection.org_members.user ?= @request.auth.id",
-        "createRule": "@collection.org_members.organization ?= application.job.organization && @collection.org_members.user ?= @request.auth.id",
-        "updateRule": "author = @request.auth.id",
-        "deleteRule": "author = @request.auth.id",
+        "listRule": "@request.auth.id != '' && @collection.org_members.user ?= @request.auth.id && @collection.org_members.organization ?= @collection.jobs.organization && @collection.jobs.id ?= @collection.job_applications.job && @collection.job_applications.id ?= application",
+        "viewRule": "@request.auth.id != '' && @collection.org_members.user ?= @request.auth.id && @collection.org_members.organization ?= @collection.jobs.organization && @collection.jobs.id ?= @collection.job_applications.job && @collection.job_applications.id ?= application",
+        "createRule": "@request.auth.id != '' && @collection.org_members.user ?= @request.auth.id",
+        "updateRule": "@request.auth.id != '' && author = @request.auth.id",
+        "deleteRule": "@request.auth.id != '' && author = @request.auth.id",
         "name": "application_comments",
         "type": "base",
         "fields": [
@@ -819,32 +819,6 @@
                 "required": true,
                 "system": true,
                 "type": "text"
-            },
-            {
-                "cascadeDelete": true,
-                "collectionId": "pbc_2689671926",
-                "hidden": false,
-                "id": "relation2757483969",
-                "maxSelect": 1,
-                "minSelect": 0,
-                "name": "application",
-                "presentable": false,
-                "required": true,
-                "system": false,
-                "type": "relation"
-            },
-            {
-                "cascadeDelete": true,
-                "collectionId": "_pb_users_auth_",
-                "hidden": false,
-                "id": "relation3182418120",
-                "maxSelect": 1,
-                "minSelect": 0,
-                "name": "author",
-                "presentable": false,
-                "required": true,
-                "system": false,
-                "type": "relation"
             },
             {
                 "autogeneratePattern": "",
@@ -953,6 +927,34 @@
                 "type": "number"
             },
             {
+                "autogeneratePattern": "",
+                "hidden": false,
+                "id": "text2757483969",
+                "max": 0,
+                "min": 0,
+                "name": "application",
+                "pattern": "",
+                "presentable": false,
+                "primaryKey": false,
+                "required": false,
+                "system": false,
+                "type": "text"
+            },
+            {
+                "autogeneratePattern": "",
+                "hidden": false,
+                "id": "text3182418120",
+                "max": 0,
+                "min": 0,
+                "name": "author",
+                "pattern": "",
+                "presentable": false,
+                "primaryKey": false,
+                "required": false,
+                "system": false,
+                "type": "text"
+            },
+            {
                 "hidden": false,
                 "id": "autodate2990389176",
                 "name": "created",
@@ -973,15 +975,17 @@
                 "type": "autodate"
             }
         ],
-        "indexes": [],
+        "indexes": [
+            "CREATE INDEX idx_application_comments_application ON application_comments (application)"
+        ],
         "system": false
     },
     {
         "id": "pbc_1201434480",
-        "listRule": "user = @request.auth.id || (@request.auth.role != 'Applicant' && is_open_to_work = true)",
-        "viewRule": "user = @request.auth.id || (@request.auth.role != 'Applicant' && is_open_to_work = true)",
-        "createRule": "id = @request.auth.id",
-        "updateRule": "user = @request.auth.id",
+        "listRule": "@request.auth.id != '' && (user = @request.auth.id || @collection.org_members.user ?= @request.auth.id)",
+        "viewRule": "@request.auth.id != '' && (user = @request.auth.id || @collection.org_members.user ?= @request.auth.id)",
+        "createRule": "@request.auth.id != ''",
+        "updateRule": "@request.auth.id != '' && user = @request.auth.id",
         "deleteRule": null,
         "name": "candidate_profiles",
         "type": "base",
@@ -1001,17 +1005,18 @@
                 "type": "text"
             },
             {
-                "cascadeDelete": true,
-                "collectionId": "_pb_users_auth_",
+                "autogeneratePattern": "",
                 "hidden": false,
-                "id": "relation1608019204",
-                "maxSelect": 1,
-                "minSelect": 0,
+                "id": "text2375276105",
+                "max": 0,
+                "min": 0,
                 "name": "user",
+                "pattern": "",
                 "presentable": false,
-                "required": true,
+                "primaryKey": false,
+                "required": false,
                 "system": false,
-                "type": "relation"
+                "type": "text"
             },
             {
                 "autogeneratePattern": "",
@@ -1107,19 +1112,6 @@
                 "required": false,
                 "system": false,
                 "type": "bool"
-            },
-            {
-                "cascadeDelete": false,
-                "collectionId": "pbc_3865025440",
-                "hidden": false,
-                "id": "relation1567207507",
-                "maxSelect": 999,
-                "minSelect": 0,
-                "name": "preference",
-                "presentable": false,
-                "required": false,
-                "system": false,
-                "type": "relation"
             },
             {
                 "hidden": false,
@@ -1295,6 +1287,16 @@
             },
             {
                 "hidden": false,
+                "id": "json1567207507",
+                "maxSize": 0,
+                "name": "preference",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "json"
+            },
+            {
+                "hidden": false,
                 "id": "autodate2990389176",
                 "name": "created",
                 "onCreate": true,
@@ -1315,14 +1317,14 @@
             }
         ],
         "indexes": [
-            "CREATE UNIQUE INDEX idx_unique_user ON candidate_profiles (user)"
+            "CREATE INDEX idx_candidate_profiles_user ON candidate_profiles (user)"
         ],
         "system": false
     },
     {
         "id": "pbc_664216842",
-        "listRule": null,
-        "viewRule": null,
+        "listRule": "",
+        "viewRule": "",
         "createRule": null,
         "updateRule": null,
         "deleteRule": null,
@@ -1416,8 +1418,8 @@
     },
     {
         "id": "pbc_3865025440",
-        "listRule": "@request.auth.id != '' && ((@collection.org_members.organization ?= id && @collection.org_members.user ?= @request.auth.id) || (@collection.job_invitations.organization ?= id && @collection.job_invitations.candidate_profile.user ?= @request.auth.id) || (@collection.job_applications.job.organization ?= id && @collection.job_applications.applicant.user ?= @request.auth.id))",
-        "viewRule": "(@collection.jobs.organization ?= id && @collection.jobs.stage ?= 'Open') || (@request.auth.id != '' && ((@collection.org_members.organization ?= id && @collection.org_members.user ?= @request.auth.id) || (@collection.job_invitations.organization ?= id && @collection.job_invitations.candidate_profile.user ?= @request.auth.id) || (@collection.job_applications.job.organization ?= id && @collection.job_applications.applicant.user ?= @request.auth.id)))",
+        "listRule": "",
+        "viewRule": "",
         "createRule": null,
         "updateRule": "@request.auth.is_super_admin = true",
         "deleteRule": "@request.auth.is_super_admin = true",
@@ -1478,11 +1480,11 @@
     },
     {
         "id": "pbc_2689671926",
-        "listRule": "applicant.user.id = @request.auth.id || (@collection.org_members.organization ?= job.organization && @collection.org_members.user ?= @request.auth.id)",
-        "viewRule": "applicant.user.id = @request.auth.id || (@collection.org_members.organization ?= job.organization && @collection.org_members.user ?= @request.auth.id)",
-        "createRule": "applicant.user.id = @request.auth.id",
-        "updateRule": "@collection.org_members.organization ?= job.organization && @collection.org_members.user ?= @request.auth.id",
-        "deleteRule": "@collection.org_members.organization ?= job.organization && @collection.org_members.user ?= @request.auth.id",
+        "listRule": "@request.auth.id != '' && (applicant = @request.auth.id || (@collection.org_members.user ?= @request.auth.id && @collection.org_members.organization ?= @collection.jobs.organization && @collection.jobs.id ?= job))",
+        "viewRule": "@request.auth.id != '' && (applicant = @request.auth.id || (@collection.org_members.user ?= @request.auth.id && @collection.org_members.organization ?= @collection.jobs.organization && @collection.jobs.id ?= job))",
+        "createRule": "@request.auth.id != ''",
+        "updateRule": "@request.auth.id != '' && (applicant = @request.auth.id || (@collection.org_members.user ?= @request.auth.id && @collection.org_members.organization ?= @collection.jobs.organization && @collection.jobs.id ?= job))",
+        "deleteRule": "@request.auth.id != '' && applicant = @request.auth.id",
         "name": "job_applications",
         "type": "base",
         "fields": [
@@ -1501,30 +1503,32 @@
                 "type": "text"
             },
             {
-                "cascadeDelete": true,
-                "collectionId": "pbc_2409499253",
+                "autogeneratePattern": "",
                 "hidden": false,
-                "id": "relation1841041711",
-                "maxSelect": 1,
-                "minSelect": 0,
+                "id": "text4225294584",
+                "max": 0,
+                "min": 0,
                 "name": "job",
+                "pattern": "",
                 "presentable": false,
-                "required": true,
+                "primaryKey": false,
+                "required": false,
                 "system": false,
-                "type": "relation"
+                "type": "text"
             },
             {
-                "cascadeDelete": true,
-                "collectionId": "pbc_1201434480",
+                "autogeneratePattern": "",
                 "hidden": false,
-                "id": "relation25399175472",
-                "maxSelect": 1,
-                "minSelect": 0,
+                "id": "text3400339481",
+                "max": 0,
+                "min": 0,
                 "name": "applicant",
+                "pattern": "",
                 "presentable": false,
-                "required": true,
+                "primaryKey": false,
+                "required": false,
                 "system": false,
-                "type": "relation"
+                "type": "text"
             },
             {
                 "hidden": false,
@@ -1689,17 +1693,19 @@
             }
         ],
         "indexes": [
-            "CREATE UNIQUE INDEX idx_app_uniq ON job_applications (job, applicant)"
+            "CREATE INDEX idx_job_applications_job ON job_applications (job)",
+            "CREATE INDEX idx_job_applications_applicant ON job_applications (applicant)",
+            "CREATE INDEX idx_job_applications_stage ON job_applications (stage)"
         ],
         "system": false
     },
     {
         "id": "pbc_2894643148",
-        "listRule": "@collection.org_members.organization ?= job.organization && @collection.org_members.user ?= @request.auth.id",
-        "viewRule": "@collection.org_members.organization ?= job.organization && @collection.org_members.user ?= @request.auth.id",
-        "createRule": "@collection.org_members.organization ?= job.organization && @collection.org_members.user ?= @request.auth.id",
-        "updateRule": "@collection.org_members.organization ?= job.organization && @collection.org_members.user ?= @request.auth.id",
-        "deleteRule": "@collection.org_members.organization ?= job.organization && @collection.org_members.user ?= @request.auth.id",
+        "listRule": "@request.auth.id != '' && @collection.org_members.user ?= @request.auth.id && @collection.org_members.organization ?= @collection.jobs.organization && @collection.jobs.id ?= job",
+        "viewRule": "@request.auth.id != '' && @collection.org_members.user ?= @request.auth.id && @collection.org_members.organization ?= @collection.jobs.organization && @collection.jobs.id ?= job",
+        "createRule": "@request.auth.id != '' && @collection.org_members.user ?= @request.auth.id",
+        "updateRule": "@request.auth.id != '' && @collection.org_members.user ?= @request.auth.id",
+        "deleteRule": "@request.auth.id != '' && @collection.org_members.user ?= @request.auth.id",
         "name": "job_internals",
         "type": "base",
         "fields": [
@@ -1729,19 +1735,6 @@
                 "type": "editor"
             },
             {
-                "cascadeDelete": true,
-                "collectionId": "pbc_2409499253",
-                "hidden": false,
-                "id": "relation4225294584",
-                "maxSelect": 1,
-                "minSelect": 0,
-                "name": "job",
-                "presentable": false,
-                "required": true,
-                "system": false,
-                "type": "relation"
-            },
-            {
                 "hidden": false,
                 "id": "number405181692",
                 "max": null,
@@ -1752,6 +1745,20 @@
                 "required": false,
                 "system": false,
                 "type": "number"
+            },
+            {
+                "autogeneratePattern": "",
+                "hidden": false,
+                "id": "text4225294584",
+                "max": 0,
+                "min": 0,
+                "name": "job",
+                "pattern": "",
+                "presentable": false,
+                "primaryKey": false,
+                "required": false,
+                "system": false,
+                "type": "text"
             },
             {
                 "hidden": false,
@@ -1781,10 +1788,10 @@
     },
     {
         "id": "pbc_772269685",
-        "listRule": "candidate_profile.user.id = @request.auth.id || (@collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id)",
-        "viewRule": "candidate_profile.user.id = @request.auth.id || (@collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id)",
-        "createRule": "@collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id && (@collection.org_members.role = 'owner' || @collection.org_members.role = 'recruiter')",
-        "updateRule": "candidate_profile.user.id = @request.auth.id",
+        "listRule": "@request.auth.id != '' && (@collection.candidate_profiles.user ?= @request.auth.id && @collection.candidate_profiles.id ?= candidate_profile || @collection.org_members.user ?= @request.auth.id && @collection.org_members.organization ?= organization)",
+        "viewRule": "@request.auth.id != '' && (@collection.candidate_profiles.user ?= @request.auth.id && @collection.candidate_profiles.id ?= candidate_profile || @collection.org_members.user ?= @request.auth.id && @collection.org_members.organization ?= organization)",
+        "createRule": "@request.auth.id != '' && @collection.org_members.user ?= @request.auth.id && @collection.org_members.organization ?= organization",
+        "updateRule": "@request.auth.id != '' && @collection.org_members.user ?= @request.auth.id && @collection.org_members.organization ?= organization",
         "deleteRule": null,
         "name": "job_invitations",
         "type": "base",
@@ -1804,43 +1811,46 @@
                 "type": "text"
             },
             {
-                "cascadeDelete": false,
-                "collectionId": "pbc_3866053794",
+                "autogeneratePattern": "",
                 "hidden": false,
-                "id": "relation1115430015",
-                "maxSelect": 1,
-                "minSelect": 0,
+                "id": "text3253625724",
+                "max": 0,
+                "min": 0,
                 "name": "organization",
+                "pattern": "",
                 "presentable": false,
+                "primaryKey": false,
                 "required": false,
                 "system": false,
-                "type": "relation"
+                "type": "text"
             },
             {
-                "cascadeDelete": false,
-                "collectionId": "pbc_2409499253",
+                "autogeneratePattern": "",
                 "hidden": false,
-                "id": "relation4225294584",
-                "maxSelect": 1,
-                "minSelect": 0,
+                "id": "text4225294584",
+                "max": 0,
+                "min": 0,
                 "name": "job",
+                "pattern": "",
                 "presentable": false,
+                "primaryKey": false,
                 "required": false,
                 "system": false,
-                "type": "relation"
+                "type": "text"
             },
             {
-                "cascadeDelete": false,
-                "collectionId": "pbc_1201434480",
+                "autogeneratePattern": "",
                 "hidden": false,
-                "id": "relation243664814",
-                "maxSelect": 1,
-                "minSelect": 0,
+                "id": "text243664814",
+                "max": 0,
+                "min": 0,
                 "name": "candidate_profile",
+                "pattern": "",
                 "presentable": false,
+                "primaryKey": false,
                 "required": false,
                 "system": false,
-                "type": "relation"
+                "type": "text"
             },
             {
                 "autogeneratePattern": "",
@@ -1897,11 +1907,11 @@
     },
     {
         "id": "pbc_2409499253",
-        "listRule": "stage = 'Open' || (@collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id)",
-        "viewRule": "stage = 'Open' || (@collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id)",
-        "createRule": "(@collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id) || @request.auth.is_super_admin = true",
-        "updateRule": "@collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id",
-        "deleteRule": "@collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id",
+        "listRule": "stage = 'Open'",
+        "viewRule": "@request.auth.id != '' && (stage = 'Open' || (@collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id))",
+        "createRule": "@request.auth.id != ''",
+        "updateRule": "@request.auth.id != '' && @collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id",
+        "deleteRule": "@request.auth.id != '' && @collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id",
         "name": "jobs",
         "type": "base",
         "fields": [
@@ -1934,30 +1944,32 @@
                 "type": "text"
             },
             {
-                "cascadeDelete": false,
-                "collectionId": "pbc_3865025440",
+                "autogeneratePattern": "",
                 "hidden": false,
-                "id": "relation3441287562",
-                "maxSelect": 999,
-                "minSelect": 0,
-                "name": "department",
-                "presentable": false,
-                "required": false,
-                "system": false,
-                "type": "relation"
-            },
-            {
-                "cascadeDelete": false,
-                "collectionId": "pbc_3866053794",
-                "hidden": false,
-                "id": "relation1337919823",
-                "maxSelect": 1,
-                "minSelect": 0,
+                "id": "text3253625724",
+                "max": 0,
+                "min": 0,
                 "name": "organization",
+                "pattern": "",
                 "presentable": false,
+                "primaryKey": false,
                 "required": true,
                 "system": false,
-                "type": "relation"
+                "type": "text"
+            },
+            {
+                "autogeneratePattern": "",
+                "hidden": false,
+                "id": "text3441287562",
+                "max": 0,
+                "min": 0,
+                "name": "department",
+                "pattern": "",
+                "presentable": false,
+                "primaryKey": false,
+                "required": true,
+                "system": false,
+                "type": "text"
             },
             {
                 "convertURLs": true,
@@ -2183,16 +2195,19 @@
                 "type": "autodate"
             }
         ],
-        "indexes": [],
+        "indexes": [
+            "CREATE INDEX idx_jobs_organization ON jobs (organization)",
+            "CREATE INDEX idx_jobs_stage ON jobs (stage)"
+        ],
         "system": false
     },
     {
         "id": "pbc_3554030554",
-        "listRule": "@collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id",
-        "viewRule": "@collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id",
-        "createRule": "@collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id && @collection.org_members.role = 'owner'",
-        "updateRule": "@collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id && @collection.org_members.role = 'owner'",
-        "deleteRule": "@collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id && @collection.org_members.role = 'owner'",
+        "listRule": "@request.auth.id != '' && @collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id && @collection.org_members.role ?= 'owner'",
+        "viewRule": "@request.auth.id != '' && @collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id && @collection.org_members.role ?= 'owner'",
+        "createRule": "@request.auth.id != '' && @collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id && @collection.org_members.role ?= 'owner'",
+        "updateRule": "@request.auth.id != '' && @collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id && @collection.org_members.role ?= 'owner'",
+        "deleteRule": "@request.auth.id != '' && @collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id && @collection.org_members.role ?= 'owner'",
         "name": "org_invites",
         "type": "base",
         "fields": [
@@ -2209,19 +2224,6 @@
                 "required": true,
                 "system": true,
                 "type": "text"
-            },
-            {
-                "cascadeDelete": true,
-                "collectionId": "pbc_3866053794",
-                "hidden": false,
-                "id": "relation1337919823",
-                "maxSelect": 1,
-                "minSelect": 0,
-                "name": "organization",
-                "presentable": false,
-                "required": true,
-                "system": false,
-                "type": "relation"
             },
             {
                 "exceptDomains": null,
@@ -2244,19 +2246,6 @@
                 "type": "bool"
             },
             {
-                "cascadeDelete": false,
-                "collectionId": "_pb_users_auth_",
-                "hidden": false,
-                "id": "relation1109389909",
-                "maxSelect": 1,
-                "minSelect": 0,
-                "name": "invited_by",
-                "presentable": false,
-                "required": true,
-                "system": false,
-                "type": "relation"
-            },
-            {
                 "hidden": false,
                 "id": "select1466534506",
                 "maxSelect": 1,
@@ -2270,6 +2259,34 @@
                     "billing",
                     "owner"
                 ]
+            },
+            {
+                "autogeneratePattern": "",
+                "hidden": false,
+                "id": "text3253625724",
+                "max": 0,
+                "min": 0,
+                "name": "organization",
+                "pattern": "",
+                "presentable": false,
+                "primaryKey": false,
+                "required": false,
+                "system": false,
+                "type": "text"
+            },
+            {
+                "autogeneratePattern": "",
+                "hidden": false,
+                "id": "text1109389909",
+                "max": 0,
+                "min": 0,
+                "name": "invited_by",
+                "pattern": "",
+                "presentable": false,
+                "primaryKey": false,
+                "required": false,
+                "system": false,
+                "type": "text"
             },
             {
                 "hidden": false,
@@ -2293,17 +2310,17 @@
             }
         ],
         "indexes": [
-            "CREATE UNIQUE INDEX idx_invite_uniq ON org_invites (email, organization)"
+            "CREATE UNIQUE INDEX `idx_invite_uniq` ON `org_invites` (\n  `email`,\n  `organization`\n)"
         ],
         "system": false
     },
     {
         "id": "pbc_3324945733",
-        "listRule": "user = @request.auth.id || (@collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id)",
-        "viewRule": "user = @request.auth.id || (@collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id)",
-        "createRule": "@collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id && @collection.org_members.role = 'owner'",
-        "updateRule": "@collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id && @collection.org_members.role = 'owner'",
-        "deleteRule": "@collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id && @collection.org_members.role = 'owner'",
+        "listRule": "@request.auth.id != '' && @collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id",
+        "viewRule": "@request.auth.id != '' && @collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id",
+        "createRule": "@request.auth.id != '' && @collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id && @collection.org_members.role ?= 'owner'",
+        "updateRule": "@request.auth.id != '' && @collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id && @collection.org_members.role ?= 'owner'",
+        "deleteRule": "@request.auth.id != '' && @collection.org_members.organization ?= organization && @collection.org_members.user ?= @request.auth.id && @collection.org_members.role ?= 'owner'",
         "name": "org_members",
         "type": "base",
         "fields": [
@@ -2322,30 +2339,18 @@
                 "type": "text"
             },
             {
-                "cascadeDelete": true,
-                "collectionId": "pbc_3866053794",
+                "autogeneratePattern": "",
                 "hidden": false,
-                "id": "relation1115430015",
-                "maxSelect": 1,
-                "minSelect": 0,
+                "id": "text1115430015",
+                "max": 0,
+                "min": 0,
                 "name": "organization",
+                "pattern": "",
                 "presentable": false,
+                "primaryKey": false,
                 "required": true,
                 "system": false,
-                "type": "relation"
-            },
-            {
-                "cascadeDelete": true,
-                "collectionId": "_pb_users_auth_",
-                "hidden": false,
-                "id": "relation2375276105",
-                "maxSelect": 1,
-                "minSelect": 0,
-                "name": "user",
-                "presentable": false,
-                "required": true,
-                "system": false,
-                "type": "relation"
+                "type": "text"
             },
             {
                 "hidden": false,
@@ -2361,6 +2366,20 @@
                     "billing",
                     "recruiter"
                 ]
+            },
+            {
+                "autogeneratePattern": "",
+                "hidden": false,
+                "id": "text2375276105",
+                "max": 0,
+                "min": 0,
+                "name": "user",
+                "pattern": "",
+                "presentable": false,
+                "primaryKey": false,
+                "required": true,
+                "system": false,
+                "type": "text"
             },
             {
                 "hidden": false,
@@ -2384,16 +2403,17 @@
             }
         ],
         "indexes": [
-            "CREATE UNIQUE INDEX idx_org_mem ON org_members (organization, user)"
+            "CREATE INDEX idx_org_members_organization ON org_members (organization)",
+            "CREATE INDEX idx_org_members_user ON org_members (user)"
         ],
         "system": false
     },
     {
         "id": "pbc_3866053794",
-        "listRule": "@request.auth.id != '' && ((@collection.org_members.organization ?= id && @collection.org_members.user ?= @request.auth.id) || (@collection.job_invitations.organization ?= id && @collection.job_invitations.candidate_profile.user ?= @request.auth.id) || (@collection.job_applications.job.organization ?= id && @collection.job_applications.applicant.user ?= @request.auth.id))",
-        "viewRule": "(@collection.jobs.organization ?= id && @collection.jobs.stage ?= 'Open') || (@request.auth.id != '' && ((@collection.org_members.organization ?= id && @collection.org_members.user ?= @request.auth.id) || (@collection.job_invitations.organization ?= id && @collection.job_invitations.candidate_profile.user ?= @request.auth.id) || (@collection.job_applications.job.organization ?= id && @collection.job_applications.applicant.user ?= @request.auth.id)))",
-        "createRule": "@request.auth.is_super_admin = true",
-        "updateRule": "@request.auth.is_super_admin = true || (@collection.org_members.organization ?= id && @collection.org_members.user ?= @request.auth.id)",
+        "listRule": "(@request.auth.id != '' && @collection.org_members.organization ?= id && @collection.org_members.user ?= @request.auth.id) || (@collection.jobs.organization ?= id && @collection.jobs.stage ?= \"Open\")",
+        "viewRule": "(@request.auth.id != '' && @collection.org_members.organization ?= id && @collection.org_members.user ?= @request.auth.id) || (@collection.jobs.organization ?= id && @collection.jobs.stage ?= \"Open\")",
+        "createRule": "@request.auth.id != ''",
+        "updateRule": "@request.auth.id != '' && @collection.org_members.organization ?= id && @collection.org_members.user ?= @request.auth.id && @collection.org_members.role ?= 'owner'",
         "deleteRule": "@request.auth.is_super_admin = true",
         "name": "organizations",
         "type": "base",
@@ -2502,11 +2522,64 @@
             },
             {
                 "autogeneratePattern": "",
-                "hidden": true,
+                "hidden": false,
                 "id": "text1888339527",
                 "max": 0,
                 "min": 0,
                 "name": "stripe_customer_id",
+                "pattern": "",
+                "presentable": false,
+                "primaryKey": false,
+                "required": false,
+                "system": false,
+                "type": "text"
+            },
+            {
+                "autogeneratePattern": "",
+                "hidden": false,
+                "id": "text3455741088",
+                "max": 0,
+                "min": 0,
+                "name": "industry",
+                "pattern": "",
+                "presentable": false,
+                "primaryKey": false,
+                "required": false,
+                "system": false,
+                "type": "text"
+            },
+            {
+                "autogeneratePattern": "",
+                "hidden": false,
+                "id": "text1587448267",
+                "max": 0,
+                "min": 0,
+                "name": "location",
+                "pattern": "",
+                "presentable": false,
+                "primaryKey": false,
+                "required": false,
+                "system": false,
+                "type": "text"
+            },
+            {
+                "exceptDomains": null,
+                "hidden": false,
+                "id": "url442414654",
+                "name": "linkedin_url",
+                "onlyDomains": null,
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "url"
+            },
+            {
+                "autogeneratePattern": "",
+                "hidden": false,
+                "id": "text4156564586",
+                "max": 0,
+                "min": 0,
+                "name": "size",
                 "pattern": "",
                 "presentable": false,
                 "primaryKey": false,
@@ -2540,8 +2613,8 @@
     },
     {
         "id": "pbc_631030571",
-        "listRule": "@request.auth.id != '' && @collection.org_members.user ?= @request.auth.id && @collection.org_members.organization ?= org_id",
-        "viewRule": "@request.auth.id != '' && @collection.org_members.user ?= @request.auth.id && @collection.org_members.organization ?= org_id",
+        "listRule": "@request.auth.id != '' && @collection.org_members.organization ?= org_id && @collection.org_members.user ?= @request.auth.id && (@collection.org_members.role ?= 'owner' || @collection.org_members.role ?= 'billing')",
+        "viewRule": "@request.auth.id != '' && @collection.org_members.organization ?= org_id && @collection.org_members.user ?= @request.auth.id && (@collection.org_members.role ?= 'owner' || @collection.org_members.role ?= 'billing')",
         "createRule": null,
         "updateRule": null,
         "deleteRule": null,
@@ -2786,9 +2859,9 @@
     },
     {
         "id": "pbc_2150613063",
-        "listRule": "application.applicant.user.id = @request.auth.id || (@collection.org_members.organization ?= application.job.organization && @collection.org_members.user ?= @request.auth.id)",
-        "viewRule": "application.applicant.user.id = @request.auth.id || (@collection.org_members.organization ?= application.job.organization && @collection.org_members.user ?= @request.auth.id)",
-        "createRule": "application.applicant.user.id = @request.auth.id",
+        "listRule": "@request.auth.id != '' && (@collection.job_applications.id ?= application && @collection.job_applications.applicant ?= @request.auth.id || @collection.org_members.user ?= @request.auth.id)",
+        "viewRule": "@request.auth.id != '' && (@collection.job_applications.id ?= application && @collection.job_applications.applicant ?= @request.auth.id || @collection.org_members.user ?= @request.auth.id)",
+        "createRule": "@request.auth.id != ''",
         "updateRule": null,
         "deleteRule": null,
         "name": "video_submissions",
@@ -2809,17 +2882,18 @@
                 "type": "text"
             },
             {
-                "cascadeDelete": true,
-                "collectionId": "pbc_2689671926",
+                "autogeneratePattern": "",
                 "hidden": false,
-                "id": "relation2757483969",
-                "maxSelect": 1,
-                "minSelect": 0,
+                "id": "text2757483969",
+                "max": 0,
+                "min": 0,
                 "name": "application",
+                "pattern": "",
                 "presentable": false,
-                "required": true,
+                "primaryKey": false,
+                "required": false,
                 "system": false,
-                "type": "relation"
+                "type": "text"
             },
             {
                 "hidden": false,

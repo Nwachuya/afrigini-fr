@@ -6,6 +6,8 @@ import Link from 'next/link';
 import pb from '@/lib/pocketbase';
 import { getCurrentUser, getUserRole, logout } from '@/lib/auth';
 import { UserRecord, UserRole } from '@/types';
+import { getCurrentOrgMembership } from '@/lib/org-membership';
+import { NavIconKey, getNavItems } from '@/lib/navigation';
 import Navbar from './Navbar';
 import Footer from './Footer';
 import Sidebar from './Sidebar';
@@ -26,41 +28,16 @@ import { useRouter } from 'next/navigation';
 
 const PUBLIC_PATHS = ['/', '/login', '/register', '/forgot-password'];
 
-interface NavItem {
-  label: string;
-  href: string;
-  icon: React.ReactNode;
-}
-
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<UserRecord | null>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const [orgMembershipRole, setOrgMembershipRole] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-
-  const applicantLinks: NavItem[] = [
-    { label: 'Dashboard', href: '/dashboard/applicant', icon: <LayoutDashboard size={20} /> },
-    { label: 'Jobs', href: '/jobs', icon: <Briefcase size={20} /> },
-    { label: 'My Applications', href: '/my-applications', icon: <FileText size={20} /> },
-    { label: 'My Profile', href: '/my-profile', icon: <User size={20} /> },
-    { label: 'Settings', href: '/dashboard/account-settings', icon: <Settings size={20} /> },
-  ];
-
-  const recruiterLinks: NavItem[] = [
-    { label: 'Dashboard', href: '/dashboard/organization', icon: <LayoutDashboard size={20} /> },
-    { label: 'Manage Jobs', href: '/manage-jobs', icon: <Briefcase size={20} /> },
-    { label: 'Applications', href: '/applications', icon: <FileText size={20} /> },
-    { label: 'Find Candidates', href: '/find-candidates', icon: <Search size={20} /> },
-    { label: 'Team', href: '/dashboard/team', icon: <Users size={20} /> },
-    { label: 'Billing', href: '/dashboard/billing', icon: <CreditCard size={20} /> },
-    { label: 'Organization', href: '/dashboard/organization-settings', icon: <Building2 size={20} /> },
-    { label: 'Settings', href: '/dashboard/account-settings', icon: <Settings size={20} /> },
-  ];
-
-  const links = userRole === 'Applicant' ? applicantLinks : recruiterLinks;
+  const links = getNavItems(userRole, orgMembershipRole);
 
   const isActive = (href: string) => {
     if (href === pathname) return true;
@@ -103,14 +80,25 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   // Auth state
   useEffect(() => {
-    const updateState = () => {
-      setUser(getCurrentUser());
-      setUserRole(getUserRole());
+    const updateState = async () => {
+      const currentUser = getCurrentUser();
+      const currentUserRole = getUserRole();
+
+      setUser(currentUser);
+      setUserRole(currentUserRole);
+
+      if (currentUser && currentUserRole !== 'Applicant') {
+        const membership = await getCurrentOrgMembership(currentUser.id);
+        setOrgMembershipRole(membership?.role ?? null);
+        return;
+      }
+
+      setOrgMembershipRole(null);
     };
-    updateState();
+    void updateState();
 
     const unsubscribe = pb.authStore.onChange(() => {
-      updateState();
+      void updateState();
     });
 
     return () => {
@@ -155,6 +143,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar
         user={user}
         userRole={userRole!}
+        orgMembershipRole={orgMembershipRole}
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
       />
@@ -163,6 +152,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <TopBar
         user={user}
         userRole={userRole!}
+        orgMembershipRole={orgMembershipRole}
         mobileMenuOpen={mobileMenuOpen}
         onMenuClick={() => setMobileMenuOpen(!mobileMenuOpen)}
       />
@@ -199,7 +189,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
-              <span className="flex-shrink-0">{link.icon}</span>
+              <span className="flex-shrink-0">{getNavIcon(link.icon)}</span>
               <span className="text-sm font-medium">{link.label}</span>
             </Link>
           ))}
@@ -222,7 +212,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             )}
             <div className="overflow-hidden">
               <p className="text-sm font-medium text-gray-900 truncate">{user.email}</p>
-              <p className="text-xs text-gray-500 capitalize">{userRole}</p>
+              <p className="text-xs text-gray-500 capitalize">{orgMembershipRole || userRole}</p>
             </div>
           </div>
 
@@ -247,4 +237,27 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </main>
     </>
   );
+}
+
+function getNavIcon(icon: NavIconKey) {
+  switch (icon) {
+    case 'dashboard':
+      return <LayoutDashboard size={20} />;
+    case 'briefcase':
+      return <Briefcase size={20} />;
+    case 'fileText':
+      return <FileText size={20} />;
+    case 'user':
+      return <User size={20} />;
+    case 'search':
+      return <Search size={20} />;
+    case 'users':
+      return <Users size={20} />;
+    case 'creditCard':
+      return <CreditCard size={20} />;
+    case 'building2':
+      return <Building2 size={20} />;
+    case 'settings':
+      return <Settings size={20} />;
+  }
 }

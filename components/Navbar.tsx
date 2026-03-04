@@ -1,27 +1,46 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image'; // Added Image component
+import Image from 'next/image';
 import { useState, useEffect } from 'react';
-import pb from '@/lib/pocketbase'; 
+import pb from '@/lib/pocketbase';
 import { getCurrentUser, getUserRole } from '@/lib/auth';
 import { UserRecord, UserRole } from '@/types';
+import { getCurrentOrgMembership } from '@/lib/org-membership';
+import { getDefaultDashboardPath } from '@/lib/access';
+import { getNavItems } from '@/lib/navigation';
 import UserDropdown from './UserDropdown';
 
 export default function Navbar() {
   const [user, setUser] = useState<UserRecord | null>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const [orgMembershipRole, setOrgMembershipRole] = useState<string | null>(null);
+  const dashboardHref = getDefaultDashboardPath(userRole, orgMembershipRole);
+  const navItems = getNavItems(userRole, orgMembershipRole).filter(
+    (item) => item.href !== dashboardHref && item.href !== '/candidates/account-settings'
+  );
 
   useEffect(() => {
-    const updateState = () => {
-      setUser(getCurrentUser());
-      setUserRole(getUserRole());
+    const updateState = async () => {
+      const currentUser = getCurrentUser();
+      const currentUserRole = getUserRole();
+
+      setUser(currentUser);
+      setUserRole(currentUserRole);
+
+      if (currentUser && currentUserRole !== 'Applicant') {
+        const membership = await getCurrentOrgMembership(currentUser.id);
+        setOrgMembershipRole(membership?.role ?? null);
+        return;
+      }
+
+      setOrgMembershipRole(null);
     };
 
-    updateState();
+    void updateState();
 
     const unsubscribe = pb.authStore.onChange(() => {
-      updateState();
+      void updateState();
     });
 
     return () => {
@@ -33,14 +52,13 @@ export default function Navbar() {
     <nav className="bg-white w-full border-b border-gray-200 sticky top-0 z-50">
       <div className="w-full px-6 lg:px-12 h-20 flex justify-between items-center">
         {/* Logo Section */}
-        <Link href={user ? '/dashboard' : '/'} className="flex items-center gap-3 group">
-          {/* YOUR LOGO IMAGE */}
+        <Link href={user ? dashboardHref : '/'} className="flex items-center gap-3 group">
           <div className="relative h-10 w-auto">
-            <Image 
-              src="/afrigini_logo.png"  // <--- MAKE SURE YOUR FILE IS IN /public FOLDER
+            <Image
+              src="/afrigini_logo.png"
               alt="Afrigini Logo"
-              width={150}      // Adjust width as needed
-              height={40}      // Adjust height as needed
+              width={150}
+              height={40}
               className="object-contain h-10 w-auto"
               priority
             />
@@ -66,26 +84,16 @@ export default function Navbar() {
             </>
           ) : (
             <>
-              {userRole === 'Applicant' ? (
-                <div className="hidden md:flex gap-6 text-sm font-medium text-gray-600">
-                  <Link href="/dashboard/applicant" className="hover:text-brand-green transition-colors">Dashboard</Link>
-                  <Link href="/jobs" className="hover:text-brand-green transition-colors">Jobs</Link>
-                  <Link href="/my-applications" className="hover:text-brand-green transition-colors">My Applications</Link>
-                  <Link href="/my-profile" className="hover:text-brand-green transition-colors">My Profile</Link>
-
-                </div>
-              ) : (
-                <div className="hidden md:flex gap-6 text-sm font-medium text-gray-600">
-                  <Link href="/dashboard/organization" className="hover:text-brand-green transition-colors">Dashboard</Link>
-                  <Link href="/manage-jobs" className="hover:text-brand-green transition-colors">Manage Jobs</Link>
-                  <Link href="/applications" className="hover:text-brand-green transition-colors">Applications</Link>
-                  <Link href="/find-candidates" className="hover:text-brand-green transition-colors">Find Candidates</Link>
-
-                </div>
-              )}
+              <div className="hidden md:flex gap-6 text-sm font-medium text-gray-600">
+                {navItems.slice(0, 4).map((item) => (
+                  <Link key={item.href} href={item.href} className="hover:text-brand-green transition-colors">
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
 
               <div className="pl-2 border-l border-gray-200">
-                <UserDropdown user={user} userRole={userRole!} />
+                <UserDropdown user={user} userRole={userRole!} orgMembershipRole={orgMembershipRole} />
               </div>
             </>
           )}

@@ -4,16 +4,25 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Menu, X } from 'lucide-react';
 import { UserRecord, UserRole } from '@/types';
+import { getDefaultDashboardPath } from '@/lib/access';
 
 interface TopBarProps {
   user: UserRecord;
   userRole: UserRole;
+  orgMembershipRole?: string | null;
   mobileMenuOpen: boolean;
   onMenuClick: () => void;
 }
 
-export default function TopBar({ user, userRole, mobileMenuOpen, onMenuClick }: TopBarProps) {
+export default function TopBar({
+  user,
+  userRole,
+  orgMembershipRole,
+  mobileMenuOpen,
+  onMenuClick,
+}: TopBarProps) {
   const initial = user.email ? user.email[0].toUpperCase() : 'U';
+  const dashboardHref = getDefaultDashboardPath(userRole, orgMembershipRole);
 
   return (
     <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-30 md:hidden">
@@ -27,7 +36,7 @@ export default function TopBar({ user, userRole, mobileMenuOpen, onMenuClick }: 
         </button>
 
         {/* Center: Logo */}
-        <Link href="/dashboard">
+        <Link href={dashboardHref}>
           <Image
             src="/afrigini_logo.png"
             alt="Afrigini Logo"

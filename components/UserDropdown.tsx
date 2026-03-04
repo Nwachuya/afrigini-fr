@@ -4,8 +4,17 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { logout } from '@/lib/auth';
 import { UserRecord, UserRole } from '@/types';
+import { canAccessBilling, canManageOrganization, canManageTeam } from '@/lib/access';
 
-export default function UserDropdown({ user, userRole }: { user: UserRecord; userRole: UserRole }) {
+export default function UserDropdown({
+  user,
+  userRole,
+  orgMembershipRole,
+}: {
+  user: UserRecord;
+  userRole: UserRole;
+  orgMembershipRole?: string | null;
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -46,21 +55,33 @@ export default function UserDropdown({ user, userRole }: { user: UserRecord; use
           <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
             <p className="text-xs text-gray-500 uppercase font-semibold">Signed in as</p>
             <p className="text-sm font-medium truncate">{user.email}</p>
-            <p className="text-xs text-blue-600 capitalize mt-1">{userRole}</p>
+            <p className="text-xs text-blue-600 capitalize mt-1">{orgMembershipRole || userRole}</p>
           </div>
 
           {/* Company Specific Menu Items */}
           {userRole !== 'Applicant' && (
             <>
-              <Link href="/dashboard/team" className="block px-4 py-2 text-sm hover:bg-gray-100">Team</Link>
-              <Link href="/dashboard/billing" className="block px-4 py-2 text-sm hover:bg-gray-100">Billing</Link>
-              <Link href="/dashboard/organization-settings" className="block px-4 py-2 text-sm hover:bg-gray-100">Organization Settings</Link>
-              <div className="border-t border-gray-100 my-1"></div>
+              {canManageTeam(orgMembershipRole) && (
+                <Link href="/org/team" className="block px-4 py-2 text-sm hover:bg-gray-100">Team</Link>
+              )}
+              {canAccessBilling(orgMembershipRole) && (
+                <Link href="/org/billing" className="block px-4 py-2 text-sm hover:bg-gray-100">Billing</Link>
+              )}
+              {canManageOrganization(orgMembershipRole) && (
+                <Link href="/org/organization-settings" className="block px-4 py-2 text-sm hover:bg-gray-100">Organization Settings</Link>
+              )}
+              {(canManageTeam(orgMembershipRole) ||
+                canAccessBilling(orgMembershipRole) ||
+                canManageOrganization(orgMembershipRole)) && (
+                <div className="border-t border-gray-100 my-1"></div>
+              )}
             </>
           )}
 
           {/* Common Menu Items */}
-          <Link href="/dashboard/account-settings" className="block px-4 py-2 text-sm hover:bg-gray-100">Account Settings</Link>
+          {userRole === 'Applicant' && (
+            <Link href="/candidates/account-settings" className="block px-4 py-2 text-sm hover:bg-gray-100">Account Settings</Link>
+          )}
           
           <div className="border-t border-gray-100 my-1"></div>
           
