@@ -1,8 +1,12 @@
 {
   "/icon/[[...__metadata_id__]]/route": "app/icon/[[...__metadata_id__]]/route.js",
   "/(private)/org/team/page": "app/(private)/org/team/page.js",
-  "/(private)/org/manage-jobs/page": "app/(private)/org/manage-jobs/page.js",
   "/(public)/login/page": "app/(public)/login/page.js",
   "/(private)/org/applications/page": "app/(private)/org/applications/page.js",
-  "/(private)/org/find-candidates/page": "app/(private)/org/find-candidates/page.js"
+  "/(private)/org/find-candidates/page": "app/(private)/org/find-candidates/page.js",
+  "/api/session/route": "app/api/session/route.js",
+  "/(public)/page": "app/(public)/page.js",
+  "/(public)/register/page": "app/(public)/register/page.js",
+  "/(private)/org/organization/page": "app/(private)/org/organization/page.js",
+  "/(private)/org/manage-jobs/page": "app/(private)/org/manage-jobs/page.js"
 }
