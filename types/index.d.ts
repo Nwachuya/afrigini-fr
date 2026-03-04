@@ -59,6 +59,11 @@ export interface OrganizationRecord extends BaseRecord {
   about?: string;
   website?: string;
   logo?: string;
+  industry?: string;
+  location?: string;
+  linkedin_url?: string;
+  size?: string;
+  stripe_customer_id?: string;
 }
 
 export interface JobRecord extends BaseRecord {
