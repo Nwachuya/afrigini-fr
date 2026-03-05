@@ -1,5 +1,13 @@
 import type { UserRole } from '@/types';
 
+function normalizeOrgRole(role?: string | null): string | null {
+  if (!role) {
+    return null;
+  }
+
+  return role.trim().toLowerCase();
+}
+
 export function isApplicantRole(role?: UserRole | null): role is 'Applicant' {
   return role === 'Applicant';
 }
@@ -17,7 +25,8 @@ export function canAccessOrgNamespace(role?: UserRole | null): boolean {
 }
 
 export function canManageJobs(role?: string | null): boolean {
-  return role === 'owner' || role === 'recruiter' || role === 'billing';
+  const normalizedRole = normalizeOrgRole(role);
+  return normalizedRole === 'owner' || normalizedRole === 'recruiter' || normalizedRole === 'billing';
 }
 
 export function canReviewApplications(role?: string | null): boolean {
@@ -33,19 +42,21 @@ export function canBrowseCandidates(role?: string | null): boolean {
 }
 
 export function canViewTeam(role?: string | null): boolean {
-  return role === 'owner' || role === 'recruiter' || role === 'billing';
+  const normalizedRole = normalizeOrgRole(role);
+  return normalizedRole === 'owner' || normalizedRole === 'recruiter' || normalizedRole === 'billing';
 }
 
 export function canManageTeam(role?: string | null): boolean {
-  return role === 'owner';
+  return normalizeOrgRole(role) === 'owner';
 }
 
 export function canManageOrganization(role?: string | null): boolean {
-  return role === 'owner';
+  return normalizeOrgRole(role) === 'owner';
 }
 
 export function canAccessBilling(role?: string | null): boolean {
-  return role === 'owner' || role === 'billing';
+  const normalizedRole = normalizeOrgRole(role);
+  return normalizedRole === 'owner' || normalizedRole === 'billing';
 }
 
 export function getDefaultOrgPath(role?: string | null): string {

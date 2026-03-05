@@ -238,9 +238,17 @@ function BillingContent() {
       return;
     }
 
-    if (!plan.price_id) {
+    if (!canAccessBilling(memberRole)) {
       setBanner({
-        text: 'This plan is not configured for in-app checkout yet. Credits can only be allocated through the app checkout flow.',
+        text: 'Your current role does not have permission to purchase credits.',
+        type: 'error',
+      });
+      return;
+    }
+
+    if (!plan.price_id && !plan.payment_link) {
+      setBanner({
+        text: 'This plan is not configured for checkout yet.',
         type: 'error',
       });
       return;
@@ -250,6 +258,11 @@ function BillingContent() {
     setBanner({ text: '', type: '' });
 
     try {
+      if (plan.payment_link && !plan.price_id) {
+        window.location.assign(plan.payment_link);
+        return;
+      }
+
       const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -300,6 +313,7 @@ function BillingContent() {
     credits > 0
       ? 'You have credits available for new job posts.'
       : 'You have no credits available. Purchase a pack to post new roles.';
+  const canPurchaseCredits = canAccessBilling(memberRole);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -432,10 +446,14 @@ function BillingContent() {
 
                       <button
                         onClick={() => handleBuyCredits(plan)}
-                        disabled={processing !== null || !plan.price_id}
+                        disabled={processing !== null || !canPurchaseCredits || (!plan.price_id && !plan.payment_link)}
                         className="mt-6 w-full rounded-lg bg-brand-green px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-green-800 disabled:opacity-60"
                       >
-                        {processing === plan.id ? 'Redirecting...' : 'Purchase'}
+                        {processing === plan.id
+                          ? 'Redirecting...'
+                          : plan.payment_link && !plan.price_id
+                            ? 'Open Checkout'
+                            : 'Purchase'}
                       </button>
                     </div>
                   ))}
