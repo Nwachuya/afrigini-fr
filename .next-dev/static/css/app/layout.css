@@ -2627,6 +2627,10 @@ body {
     gap: 1.5rem;
   }
 
+  .sm\:self-center {
+    align-self: center;
+  }
+
   .sm\:p-12 {
     padding: 3rem;
   }

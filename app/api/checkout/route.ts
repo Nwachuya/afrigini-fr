@@ -13,10 +13,13 @@ const PB_URL = process.env.NEXT_PUBLIC_POCKETBASE_URL || 'https://pb.afrigini.co
 export async function POST(request: NextRequest) {
   try {
     const sessionCookie = request.cookies.get(APP_SESSION_COOKIE)?.value;
-    const pbToken = request.cookies.get(PB_TOKEN_COOKIE)?.value;
-    const authenticatedSession = sessionCookie ? await verifySessionToken(sessionCookie) : null;
+    const sessionData = sessionCookie ? await verifySessionToken(sessionCookie) : null;
+    const cookiePbToken = request.cookies.get(PB_TOKEN_COOKIE)?.value;
+    const authHeader = request.headers.get('authorization') || '';
+    const bearerPbToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+    const pbToken = cookiePbToken || bearerPbToken;
 
-    if (!authenticatedSession || !pbToken) {
+    if (!pbToken) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -25,6 +28,28 @@ export async function POST(request: NextRequest) {
 
     const pb = new PocketBase(PB_URL);
     pb.authStore.save(pbToken, null);
+    let authenticatedUserId = sessionData?.userId ?? '';
+    let authenticatedEmail = sessionData?.email ?? '';
+
+    if (!authenticatedUserId) {
+      try {
+        const authData = await pb.collection('users').authRefresh({ requestKey: null });
+        authenticatedUserId = authData?.record?.id || '';
+        authenticatedEmail = authData?.record?.email || authenticatedEmail;
+      } catch {
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401 }
+        );
+      }
+    }
+
+    if (!authenticatedUserId) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
 
     const body = await request.json();
     const { orgId, priceId } = body;
@@ -39,7 +64,7 @@ export async function POST(request: NextRequest) {
     let membership;
     try {
       membership = await pb.collection('org_members').getFirstListItem(
-        `user = "${authenticatedSession.userId}" && organization = "${orgId}"`,
+        `user = "${authenticatedUserId}" && organization = "${orgId}"`,
         { requestKey: null }
       );
     } catch {
@@ -70,7 +95,7 @@ export async function POST(request: NextRequest) {
 
     if (!customerId) {
       const customer = await stripe.customers.create({
-        email: authenticatedSession.email || undefined,
+        email: authenticatedEmail || undefined,
         name: org.name || undefined,
         metadata: {
           orgId: orgId,

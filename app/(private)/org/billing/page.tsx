@@ -263,9 +263,15 @@ function BillingContent() {
         return;
       }
 
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (pb.authStore.token) {
+        headers.Authorization = `Bearer ${pb.authStore.token}`;
+      }
+
       const response = await fetch('/api/checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
+        credentials: 'same-origin',
         body: JSON.stringify({
           orgId,
           priceId: plan.price_id,

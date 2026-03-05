@@ -4,13 +4,24 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronDown } from 'lucide-react';
 import pb from '@/lib/pocketbase';
-import { OrgInviteRecord, OrgMemberRecord, OrgRole, UserRecord } from '@/types';
+import { OrgInviteRecord, OrgRole, UserRecord } from '@/types';
 import { canManageTeam, canViewTeam, getDefaultOrgPath } from '@/lib/access';
 import { getCurrentOrgMembership } from '@/lib/org-membership';
 
 type TeamMessage = {
   text: string;
   type: '' | 'success' | 'error';
+};
+
+type TeamMember = {
+  id: string;
+  user: string;
+  role: OrgRole;
+  created: string;
+  updated: string;
+  userName?: string;
+  userEmail?: string;
+  userAvatar?: string;
 };
 
 type PendingAction =
@@ -21,7 +32,7 @@ type PendingAction =
     }
   | {
       kind: 'remove-member';
-      member: OrgMemberRecord;
+      member: TeamMember;
     }
   | {
       kind: 'revoke-invite';
@@ -74,7 +85,7 @@ export default function TeamPage() {
   const [user, setUser] = useState<UserRecord | null>(null);
   const [orgId, setOrgId] = useState<string | null>(null);
   const [memberRole, setMemberRole] = useState<OrgRole | null>(null);
-  const [members, setMembers] = useState<OrgMemberRecord[]>([]);
+  const [members, setMembers] = useState<TeamMember[]>([]);
   const [invites, setInvites] = useState<OrgInviteRecord[]>([]);
 
   const [inviteEmail, setInviteEmail] = useState('');
@@ -147,12 +158,37 @@ export default function TeamPage() {
     try {
       setLoadError('');
 
-      const membersRes = await pb.collection('org_members').getFullList({
-        filter: `organization = "${organizationId}"`,
-        expand: 'user',
-        sort: 'role',
+      const authHeader = pb.authStore.token
+        ? { Authorization: `Bearer ${pb.authStore.token}` }
+        : undefined;
+      const membersResponse = await fetch(`/api/org/team/members?orgId=${encodeURIComponent(organizationId)}`, {
+        method: 'GET',
+        headers: authHeader,
+        cache: 'no-store',
+        credentials: 'same-origin',
       });
-      setMembers(membersRes as unknown as OrgMemberRecord[]);
+      const membersPayload = await membersResponse.json();
+
+      if (!membersResponse.ok) {
+        // Fallback to direct member query if server-session cookies are stale.
+        const fallbackMembers = await pb.collection('org_members').getFullList({
+          filter: `organization = "${organizationId}"`,
+          sort: 'role',
+          requestKey: null,
+        });
+        setMembers((fallbackMembers as unknown as TeamMember[]).map((member) => ({
+          id: member.id,
+          user: member.user,
+          role: member.role,
+          created: member.created,
+          updated: member.updated,
+          userName: '',
+          userEmail: '',
+          userAvatar: '',
+        })));
+      } else {
+        setMembers((membersPayload?.members || []) as TeamMember[]);
+      }
 
       if (allowManage) {
         const invitesRes = await pb.collection('org_invites').getFullList({
@@ -236,7 +272,7 @@ export default function TeamPage() {
     }
   };
 
-  const handleRemoveMember = async (member: OrgMemberRecord) => {
+  const handleRemoveMember = async (member: TeamMember) => {
     if (!orgId || !canManage || removingMemberId || member.user === user?.id) {
       return;
     }
@@ -249,7 +285,7 @@ export default function TeamPage() {
     setPendingAction({ kind: 'remove-member', member });
   };
 
-  const removeMember = async (member: OrgMemberRecord) => {
+  const removeMember = async (member: TeamMember) => {
     if (!orgId) {
       return;
     }
@@ -261,7 +297,7 @@ export default function TeamPage() {
     try {
       await pb.collection('org_members').delete(member.id);
       setMessage({
-        text: `Removed ${member.expand?.user?.email || 'team member'} from the organization.`,
+        text: `Removed ${member.userEmail || 'team member'} from the organization.`,
         type: 'success',
       });
       await fetchData(organizationId, true);
@@ -334,8 +370,8 @@ export default function TeamPage() {
       ? `${pendingAction.email} will be invited as an owner with full team, billing, and organization access.`
       : pendingAction?.kind === 'remove-member'
         ? pendingAction.member.role === 'owner'
-          ? `Removing ${pendingAction.member.expand?.user?.email || 'this owner'} will revoke all organization access.`
-          : `Remove ${pendingAction.member.expand?.user?.email || 'this team member'} from the organization.`
+          ? `Removing ${pendingAction.member.userEmail || 'this owner'} will revoke all organization access.`
+          : `Remove ${pendingAction.member.userEmail || 'this team member'} from the organization.`
         : pendingAction?.kind === 'revoke-invite'
           ? `This will cancel the pending invitation for ${pendingAction.invite.email}.`
           : '';
@@ -549,22 +585,21 @@ export default function TeamPage() {
               <ul className="divide-y divide-gray-100">
                 {members.map((member) => {
                   const isCurrentUser = user?.id === member.user;
-                  const memberUser = member.expand?.user;
                   const displayName =
-                    memberUser?.name ||
-                    memberUser?.email ||
-                    (isCurrentUser ? user?.name || user?.email || 'You' : `Member ${member.user.slice(0, 6)}`);
+                    member.userName ||
+                    member.userEmail ||
+                    (isCurrentUser ? user?.name || user?.email || 'You' : 'Team member');
                   const secondaryLine =
-                    memberUser?.email ||
-                    (isCurrentUser ? user?.email || member.user : `User ID: ${member.user}`);
+                    member.userEmail ||
+                    (isCurrentUser ? user?.email || 'Signed in account' : 'Profile details unavailable');
                   const initial = displayName?.[0]?.toUpperCase() || 'U';
 
                   return (
-                    <li key={member.id} className="p-4 flex justify-between items-center">
-                      <div className="flex items-center gap-4">
-                        {memberUser?.avatar ? (
+                    <li key={member.id} className="p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex min-w-0 items-center gap-4">
+                        {member.userAvatar ? (
                           <img
-                            src={`${process.env.NEXT_PUBLIC_POCKETBASE_URL}/api/files/users/${memberUser.id}/${memberUser.avatar}`}
+                            src={`${process.env.NEXT_PUBLIC_POCKETBASE_URL}/api/files/users/${member.user}/${member.userAvatar}`}
                             alt={displayName}
                             className="h-10 w-10 rounded-full object-cover"
                           />
@@ -573,8 +608,8 @@ export default function TeamPage() {
                             {initial}
                           </div>
                         )}
-                        <div>
-                          <p className="font-semibold text-brand-dark">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-brand-dark break-words">
                             {displayName}
                             {isCurrentUser && (
                               <span className="ml-2 rounded-full border border-brand-green/15 bg-brand-green/10 px-2 py-0.5 text-xs font-medium text-brand-green">
@@ -582,10 +617,10 @@ export default function TeamPage() {
                               </span>
                             )}
                           </p>
-                          <p className="text-sm text-gray-500">{secondaryLine}</p>
+                          <p className="text-sm text-gray-500 break-all">{secondaryLine}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex shrink-0 items-center gap-4 self-start sm:self-center">
                         <span className="rounded-full border border-brand-green/15 bg-brand-green/10 px-3 py-1 text-xs font-medium capitalize text-brand-green">
                           {member.role}
                         </span>
