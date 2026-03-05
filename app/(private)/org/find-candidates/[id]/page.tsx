@@ -7,6 +7,7 @@ import pb from '@/lib/pocketbase';
 import { CandidateProfileRecord, JobRecord, UserRecord } from '@/types';
 import { canBrowseCandidates, canInviteCandidates, getDefaultOrgPath } from '@/lib/access';
 import { getCurrentOrgMembership } from '@/lib/org-membership';
+import { formatCandidateFullName } from '@/lib/candidate-name';
 
 function escapeFilterValue(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
@@ -220,7 +221,9 @@ export default function CandidateDetailPage() {
         status: 'pending',
       });
 
-      setInviteSuccess(`Invitation sent to ${candidate.firstName || 'this candidate'}!`);
+      setInviteSuccess(
+        `Invitation sent to ${formatCandidateFullName(candidate.firstName, candidate.lastName, 'this candidate')}!`
+      );
     } catch (err: any) {
       console.error('Invite failed:', err);
       setInviteError(err?.message || 'Failed to send invitation.');
@@ -229,7 +232,7 @@ export default function CandidateDetailPage() {
     }
   };
 
-  const fullName = [candidate?.firstName, candidate?.lastName].filter(Boolean).join(' ') || 'Unnamed Candidate';
+  const fullName = formatCandidateFullName(candidate?.firstName, candidate?.lastName, 'Unnamed Candidate');
   const skillTags = useMemo(() => toArray(candidate?.skills), [candidate?.skills]);
   const languageTags = useMemo(() => toArray(candidate?.languages), [candidate?.languages]);
   const workExperience = useMemo(() => toObjectArray<any>(candidate?.work_experience), [candidate?.work_experience]);

@@ -55,6 +55,51 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(public)/page.js"
+    ],
+    "/(private)/org/dashboard/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(private)/org/dashboard/page.js"
+    ],
+    "/(private)/org/dashboard/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(private)/org/dashboard/layout.js"
+    ],
+    "/(private)/org/find-candidates/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(private)/org/find-candidates/page.js"
+    ],
+    "/(private)/org/find-candidates/[id]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(private)/org/find-candidates/[id]/page.js"
+    ],
+    "/(private)/candidates/jobs/[id]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(private)/candidates/jobs/[id]/page.js"
+    ],
+    "/(private)/candidates/my-applications/[id]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(private)/candidates/my-applications/[id]/page.js"
+    ],
+    "/(private)/candidates/resume/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(private)/candidates/resume/page.js"
+    ],
+    "/(private)/org/team/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(private)/org/team/page.js"
+    ],
+    "/(private)/org/applications/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(private)/org/applications/page.js"
     ]
   }
 }

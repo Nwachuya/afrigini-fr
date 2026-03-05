@@ -14,6 +14,7 @@ import {
 } from '@/lib/access';
 import { getCurrentOrgMembership } from '@/lib/org-membership';
 import { buildIdEqualsFilter, hydrateApplications } from '@/lib/pb-hydration';
+import { formatCandidateFullName } from '@/lib/candidate-name';
 
 export default function OrganizationDashboard() {
   const router = useRouter();
@@ -250,9 +251,11 @@ export default function OrganizationDashboard() {
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {recentApps.map((app) => {
-                        const candidateName = app.expand?.applicant?.firstName && app.expand?.applicant?.lastName
-                          ? `${app.expand.applicant.firstName} ${app.expand.applicant.lastName}`
-                          : 'Candidate';
+                        const candidateName = formatCandidateFullName(
+                          app.expand?.applicant?.firstName,
+                          app.expand?.applicant?.lastName,
+                          'Candidate'
+                        );
                         const roleName = app.expand?.job?.role || 'Job opening';
                         return (
                           <tr key={app.id} className="hover:bg-brand-green/5 transition-colors">

@@ -16,7 +16,7 @@ export default function CandidateSummary({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="mt-5 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-5">
           <p className="whitespace-pre-wrap text-sm leading-7 text-gray-700">
             {profile.bio || 'Add a bio in your profile so recruiters can quickly understand your background and strengths.'}
@@ -27,35 +27,44 @@ export default function CandidateSummary({
           <div className="rounded-2xl border border-gray-100 bg-white p-4">
             <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-gray-500">Links</h3>
             <div className="mt-3 space-y-3 text-sm">
-              <a
-                href={profile.linkedin || undefined}
-                target="_blank"
-                rel="noreferrer"
-                className={`block rounded-xl border px-4 py-3 transition-colors ${
-                  profile.linkedin
-                    ? 'border-brand-green/20 text-brand-green hover:bg-green-50'
-                    : 'cursor-not-allowed border-gray-200 text-gray-400'
-                }`}
-              >
-                LinkedIn
-              </a>
-              <a
-                href={profile.portfolio || undefined}
-                target="_blank"
-                rel="noreferrer"
-                className={`block rounded-xl border px-4 py-3 transition-colors ${
-                  profile.portfolio
-                    ? 'border-brand-green/20 text-brand-green hover:bg-green-50'
-                    : 'cursor-not-allowed border-gray-200 text-gray-400'
-                }`}
-              >
-                Portfolio
-              </a>
+              {profile.linkedin ? (
+                <a
+                  href={profile.linkedin}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block rounded-xl border border-brand-green/20 px-4 py-3 transition-colors hover:bg-green-50"
+                >
+                  <p className="font-semibold text-brand-green">LinkedIn</p>
+                  <p className="mt-1 truncate text-xs text-gray-500">{profile.linkedin}</p>
+                </a>
+              ) : (
+                <div className="rounded-xl border border-gray-200 px-4 py-3 text-gray-400">
+                  <p className="font-semibold">LinkedIn</p>
+                  <p className="mt-1 text-xs">Not provided</p>
+                </div>
+              )}
+
+              {profile.portfolio ? (
+                <a
+                  href={profile.portfolio}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block rounded-xl border border-brand-green/20 px-4 py-3 transition-colors hover:bg-green-50"
+                >
+                  <p className="font-semibold text-brand-green">Portfolio</p>
+                  <p className="mt-1 truncate text-xs text-gray-500">{profile.portfolio}</p>
+                </a>
+              ) : (
+                <div className="rounded-xl border border-gray-200 px-4 py-3 text-gray-400">
+                  <p className="font-semibold">Portfolio</p>
+                  <p className="mt-1 text-xs">Not provided</p>
+                </div>
+              )}
             </div>
           </div>
 
           <div className="rounded-2xl border border-gray-100 bg-white p-4">
-            <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-gray-500">Preferences</h3>
+            <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-gray-500">Department Preferences</h3>
             {preferences.length > 0 ? (
               <div className="mt-3 flex flex-wrap gap-2">
                 {preferences.map((item) => (

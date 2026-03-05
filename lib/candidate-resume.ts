@@ -1,4 +1,5 @@
 import type { CandidateProfileRecord } from '@/types';
+import { formatCandidateFullName, toProperCaseNamePart } from '@/lib/candidate-name';
 
 export type ResumeWorkExperienceItem = {
   role?: string;
@@ -73,12 +74,13 @@ export function parseObjectArray<T extends Record<string, unknown>>(value: unkno
 }
 
 export function getCandidateFullName(profile: CandidateProfileRecord | null): string {
-  const fullName = [profile?.firstName, profile?.lastName].filter(Boolean).join(' ').trim();
-  return fullName || 'Your Candidate Profile';
+  return formatCandidateFullName(profile?.firstName, profile?.lastName, 'Your Candidate Profile');
 }
 
 export function getCandidateInitials(profile: CandidateProfileRecord | null): string {
-  const initials = `${profile?.firstName?.[0] || ''}${profile?.lastName?.[0] || ''}`.toUpperCase();
+  const firstInitial = toProperCaseNamePart(profile?.firstName).charAt(0);
+  const lastInitial = toProperCaseNamePart(profile?.lastName).charAt(0);
+  const initials = `${firstInitial}${lastInitial}`.toUpperCase();
   return initials || 'CP';
 }
 

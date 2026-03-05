@@ -9,6 +9,7 @@ import { ApplicationCommentRecord, JobApplicationRecord, UserRecord } from '@/ty
 import { canReviewApplications, getDefaultOrgPath } from '@/lib/access';
 import { getCurrentOrgMembership } from '@/lib/org-membership';
 import { hydrateApplications } from '@/lib/pb-hydration';
+import { formatCandidateFullName } from '@/lib/candidate-name';
 
 // --- Interfaces ---
 
@@ -170,7 +171,9 @@ export default function ApplicationReviewPage() {
 
   const applicant = app.expand?.applicant;
   const job = app.expand?.job;
-  const fullName = applicant ? `${applicant.firstName} ${applicant.lastName}` : 'Unknown Candidate';
+  const fullName = applicant
+    ? formatCandidateFullName(applicant.firstName, applicant.lastName, 'Unknown Candidate')
+    : 'Unknown Candidate';
   
   let skillsList: string[] = [];
   if (Array.isArray(applicant?.skills)) skillsList = applicant.skills;

@@ -1,9 +1,10 @@
 {
   "/icon/[[...__metadata_id__]]/route": "app/icon/[[...__metadata_id__]]/route.js",
-  "/(private)/candidates/my-applications/page": "app/(private)/candidates/my-applications/page.js",
-  "/(private)/org/manage-jobs/page": "app/(private)/org/manage-jobs/page.js",
-  "/(private)/candidates/jobs/page": "app/(private)/candidates/jobs/page.js",
-  "/(public)/page": "app/(public)/page.js",
-  "/(private)/org/settings/page": "app/(private)/org/settings/page.js",
-  "/(private)/candidates/settings/page": "app/(private)/candidates/settings/page.js"
+  "/(private)/candidates/resume/page": "app/(private)/candidates/resume/page.js",
+  "/(private)/org/find-candidates/page": "app/(private)/org/find-candidates/page.js",
+  "/(private)/org/team/page": "app/(private)/org/team/page.js",
+  "/(private)/candidates/my-profile/page": "app/(private)/candidates/my-profile/page.js",
+  "/(private)/candidates/settings/page": "app/(private)/candidates/settings/page.js",
+  "/(private)/candidates/applicant/page": "app/(private)/candidates/applicant/page.js",
+  "/(private)/org/dashboard/page": "app/(private)/org/dashboard/page.js"
 }

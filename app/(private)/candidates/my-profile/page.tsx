@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, KeyboardEvent, ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import pb from '@/lib/pocketbase';
 import { UserRecord, CandidateProfileRecord, DepartmentRecord } from '@/types';
+import { toProperCaseNamePart } from '@/lib/candidate-name';
 import {
   User,
   Briefcase,
@@ -192,8 +193,8 @@ export default function MyProfilePage() {
           
           if (profile) {
             setProfileId(profile.id);
-            setFirstName(profile.firstName || '');
-            setLastName(profile.lastName || '');
+            setFirstName(toProperCaseNamePart(profile.firstName || ''));
+            setLastName(toProperCaseNamePart(profile.lastName || ''));
             setHeadline(profile.headline || '');
             setBio(profile.bio || '');
             setCountry(profile.country || '');
@@ -295,8 +296,8 @@ export default function MyProfilePage() {
         } catch (e) {
           if (currentUser.name) {
             const parts = currentUser.name.split(' ');
-            if (parts.length > 0) setFirstName(parts[0]);
-            if (parts.length > 1) setLastName(parts.slice(1).join(' '));
+            if (parts.length > 0) setFirstName(toProperCaseNamePart(parts[0]));
+            if (parts.length > 1) setLastName(toProperCaseNamePart(parts.slice(1).join(' ')));
           }
         }
 
@@ -463,10 +464,15 @@ export default function MyProfilePage() {
     setMessage({ text: '', type: '' });
 
     try {
+      const normalizedFirstName = toProperCaseNamePart(firstName);
+      const normalizedLastName = toProperCaseNamePart(lastName);
+      setFirstName(normalizedFirstName);
+      setLastName(normalizedLastName);
+
       const formData = new FormData();
       formData.append('user', user!.id);
-      formData.append('firstName', firstName);
-      formData.append('lastName', lastName);
+      formData.append('firstName', normalizedFirstName);
+      formData.append('lastName', normalizedLastName);
       formData.append('headline', headline);
       formData.append('bio', bio);
       formData.append('country', country);
@@ -717,11 +723,27 @@ export default function MyProfilePage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className={labelClass}>First Name *</label>
-                      <input type="text" required value={firstName} onChange={e => setFirstName(e.target.value)} className={inputClass} placeholder="John" />
+                      <input
+                        type="text"
+                        required
+                        value={firstName}
+                        onChange={e => setFirstName(e.target.value)}
+                        onBlur={e => setFirstName(toProperCaseNamePart(e.target.value))}
+                        className={inputClass}
+                        placeholder="John"
+                      />
                     </div>
                     <div>
                       <label className={labelClass}>Last Name *</label>
-                      <input type="text" required value={lastName} onChange={e => setLastName(e.target.value)} className={inputClass} placeholder="Doe" />
+                      <input
+                        type="text"
+                        required
+                        value={lastName}
+                        onChange={e => setLastName(e.target.value)}
+                        onBlur={e => setLastName(toProperCaseNamePart(e.target.value))}
+                        className={inputClass}
+                        placeholder="Doe"
+                      />
                     </div>
                     <div className="sm:col-span-2">
                       <label className={labelClass}>Professional Headline</label>

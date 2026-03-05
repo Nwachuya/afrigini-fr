@@ -14,6 +14,7 @@ import {
 import { canReviewApplications, getDefaultOrgPath } from '@/lib/access';
 import { getCurrentOrgMembership } from '@/lib/org-membership';
 import { buildIdEqualsFilter, hydrateApplications } from '@/lib/pb-hydration';
+import { formatCandidateFullName } from '@/lib/candidate-name';
 
 const PER_PAGE = 10;
 const STAGE_OPTIONS: JobApplicationRecord['stage'][] = [
@@ -408,7 +409,9 @@ export default function ApplicationsPage() {
               {applications.map((app) => {
                 const applicant = app.expand?.applicant;
                 const job = app.expand?.job;
-                const fullName = applicant ? `${applicant.firstName || ''} ${applicant.lastName || ''}`.trim() : 'Unknown User';
+                const fullName = applicant
+                  ? formatCandidateFullName(applicant.firstName, applicant.lastName, 'Unknown User')
+                  : 'Unknown User';
 
                 return (
                   <div key={app.id} className="space-y-4 rounded-2xl border border-brand-green/15 bg-white p-5 shadow-sm transition-all hover:border-brand-green/30 hover:shadow-md">
@@ -467,7 +470,9 @@ export default function ApplicationsPage() {
                   {applications.map((app) => {
                     const applicant = app.expand?.applicant;
                     const job = app.expand?.job;
-                    const fullName = applicant ? `${applicant.firstName || ''} ${applicant.lastName || ''}`.trim() : 'Unknown User';
+                    const fullName = applicant
+                      ? formatCandidateFullName(applicant.firstName, applicant.lastName, 'Unknown User')
+                      : 'Unknown User';
 
                     return (
                       <tr key={app.id} className="hover:bg-brand-green/5 transition-colors">

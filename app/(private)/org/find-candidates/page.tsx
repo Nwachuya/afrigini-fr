@@ -7,8 +7,9 @@ import pb from '@/lib/pocketbase';
 import { CandidateProfileRecord, JobRecord, UserRecord } from '@/types';
 import { canBrowseCandidates, canInviteCandidates, getDefaultOrgPath } from '@/lib/access';
 import { getCurrentOrgMembership } from '@/lib/org-membership';
+import { formatCandidateFullName } from '@/lib/candidate-name';
 
-const PER_PAGE = 10;
+const PER_PAGE = 15;
 const SORT_OPTIONS = [
   { label: 'Recently updated', value: '-updated' },
   { label: 'Oldest updated', value: 'updated' },
@@ -321,7 +322,9 @@ export default function FindCandidatesPage() {
         status: 'pending',
       });
 
-      setInviteSuccess(`Invitation sent to ${selectedCandidate.firstName || 'this candidate'}!`);
+      setInviteSuccess(
+        `Invitation sent to ${formatCandidateFullName(selectedCandidate.firstName, selectedCandidate.lastName, 'this candidate')}!`
+      );
       setTimeout(() => {
         setInviteSuccess(null);
         setSelectedCandidate(null);
@@ -535,8 +538,10 @@ export default function FindCandidatesPage() {
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 2xl:grid-cols-3">
           {candidates.map((candidate) => {
             const skillTags = getSkillTags(candidate.skills);
+            const visibleSkillTags = skillTags.length > 2 ? [skillTags[0]] : skillTags;
+            const hiddenSkillCount = skillTags.length > 2 ? skillTags.length - 1 : 0;
             const initials = getCandidateInitials(candidate);
-            const fullName = [candidate.firstName, candidate.lastName].filter(Boolean).join(' ') || 'Unnamed Candidate';
+            const fullName = formatCandidateFullName(candidate.firstName, candidate.lastName, 'Unnamed Candidate');
             const hasResume = Boolean(candidate.resume || candidate.resume_generated_pdf);
             const hasPortfolio = Boolean(candidate.portfolio);
             const hasLinkedIn = Boolean(candidate.linkedin);
@@ -579,7 +584,7 @@ export default function FindCandidatesPage() {
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-2">
-                    {skillTags.slice(0, 4).map((skill) => (
+                    {visibleSkillTags.map((skill) => (
                       <span
                         key={skill}
                         className="max-w-full truncate rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600"
@@ -588,8 +593,10 @@ export default function FindCandidatesPage() {
                         {skill}
                       </span>
                     ))}
-                    {skillTags.length > 4 && (
-                      <span className="px-1 py-1 text-xs text-gray-400">+{skillTags.length - 4}</span>
+                    {hiddenSkillCount > 0 && (
+                      <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-500">
+                        +{hiddenSkillCount} more
+                      </span>
                     )}
                   </div>
 
@@ -684,7 +691,9 @@ export default function FindCandidatesPage() {
 
                 <div className="space-y-4 p-6">
                   <p className="text-sm text-gray-600">
-                    You are inviting <strong>{selectedCandidate.firstName} {selectedCandidate.lastName}</strong> to apply.
+                    You are inviting{' '}
+                    <strong>{formatCandidateFullName(selectedCandidate.firstName, selectedCandidate.lastName, 'this candidate')}</strong>{' '}
+                    to apply.
                   </p>
 
                   {inviteError && (

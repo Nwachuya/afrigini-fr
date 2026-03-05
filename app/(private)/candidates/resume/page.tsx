@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import pb from '@/lib/pocketbase';
 import { getDefaultDashboardPath } from '@/lib/access';
-import type { CandidateProfileRecord, UserRecord } from '@/types';
+import type { CandidateProfileRecord, DepartmentRecord, UserRecord } from '@/types';
 import CandidateHero from '@/components/candidates/resume/CandidateHero';
 import CandidateSummary from '@/components/candidates/resume/CandidateSummary';
 import CandidateSkillsPanel from '@/components/candidates/resume/CandidateSkillsPanel';
@@ -29,6 +29,7 @@ export default function CandidateResumePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [profile, setProfile] = useState<CandidateProfileRecord | null>(null);
+  const [departmentLabelById, setDepartmentLabelById] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let isActive = true;
@@ -73,6 +74,30 @@ export default function CandidateResumePage() {
             setError('Failed to load your candidate preview.');
           }
         }
+
+        try {
+          const departments = await pb.collection('departments').getFullList({
+            sort: 'department',
+            requestKey: null,
+          });
+
+          if (isActive) {
+            const map = (departments as unknown as DepartmentRecord[]).reduce<Record<string, string>>(
+              (acc, department) => {
+                if (department.id && department.department) {
+                  acc[department.id] = department.department;
+                }
+                return acc;
+              },
+              {}
+            );
+            setDepartmentLabelById(map);
+          }
+        } catch {
+          if (isActive) {
+            setDepartmentLabelById({});
+          }
+        }
       } finally {
         if (isActive) {
           setLoading(false);
@@ -90,7 +115,22 @@ export default function CandidateResumePage() {
   const fullName = useMemo(() => getCandidateFullName(profile), [profile]);
   const skills = useMemo(() => parseStringArray(profile?.skills), [profile?.skills]);
   const languages = useMemo(() => parseStringArray(profile?.languages), [profile?.languages]);
-  const preferences = useMemo(() => parseStringArray(profile?.preference), [profile?.preference]);
+  const preferences = useMemo(() => {
+    const rawPreferences = parseStringArray(profile?.preference);
+
+    return rawPreferences
+      .map((item) => {
+        const label = departmentLabelById[item];
+        if (label) {
+          return label;
+        }
+
+        // PocketBase record ids are opaque/noisy in the preview.
+        const isLikelyRecordId = /^[a-z0-9]{15}$/.test(item);
+        return isLikelyRecordId ? '' : item;
+      })
+      .filter(Boolean);
+  }, [profile?.preference, departmentLabelById]);
   const workExperience = useMemo(
     () => parseObjectArray<ResumeWorkExperienceItem>(profile?.work_experience),
     [profile?.work_experience]

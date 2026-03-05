@@ -38,12 +38,12 @@ export default function CandidateResumeAssets({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-4 xl:grid-cols-2">
+      <div className="mt-5 space-y-4">
         <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-5">
           <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-gray-500">Uploaded Resume</h3>
           {uploadedResumeUrl ? (
             <div className="mt-4 space-y-3">
-              <p className="text-sm text-gray-700">{uploadedResumeName || 'Current resume file'}</p>
+              <p className="break-all text-sm text-gray-700">{uploadedResumeName || 'Current resume file'}</p>
               <a
                 href={uploadedResumeUrl}
                 target="_blank"
