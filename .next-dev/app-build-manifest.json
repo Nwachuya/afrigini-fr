@@ -30,6 +30,31 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(private)/org/billing/page.js"
+    ],
+    "/(private)/org/settings/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(private)/org/settings/page.js"
+    ],
+    "/(private)/org/manage-jobs/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(private)/org/manage-jobs/page.js"
+    ],
+    "/(private)/org/manage-jobs/new/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(private)/org/manage-jobs/new/page.js"
+    ],
+    "/(private)/org/manage-jobs/[id]/view/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(private)/org/manage-jobs/[id]/view/page.js"
+    ],
+    "/(private)/org/manage-jobs/[id]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(private)/org/manage-jobs/[id]/page.js"
     ]
   }
 }
